@@ -3,11 +3,12 @@ import { IntegrationProvider } from '../provider.interface';
 
 // Railway GraphQL API v2 — https://docs.railway.com/reference/public-api
 // Rate limits: 1000 RPH / 10 RPS (Hobby) · 10000 RPH / 50 RPS (Pro)
-// Internal limit: 16 concurrent usage queries per client
+// Internal limit: ~16-19 concurrent usage queries per client
 //
 // Key insight: estimatedUsage fans out to (N_projects × N_measurements) concurrent
-// internal queries. Fix: query ONE project at a time sequentially with 4 measurements
-// = 4 concurrent internal queries per call, well under the 16-query limit.
+// internal queries, whether queried per-project or workspace-wide. We query
+// workspace-wide (so deleted projects are included) but ONE measurement at a time,
+// keeping concurrency at N_projects — well under the limit for realistic workspaces.
 const RAILWAY_GQL = 'https://backboard.railway.app/graphql/v2';
 
 // Path A — direct dollar total; requires workspace owner / billing scope.
@@ -24,21 +25,26 @@ const BILLING_QUERY = `
   }
 `;
 
-// Path B — list every project the token can see.
-// Works for personal tokens (all projects) and project-scoped tokens (one project).
-const PROJECTS_QUERY = `
+// Path B — find the token's workspace. A deleted project can't be looked up by
+// projectId directly (Railway returns "Project not found" even with includeDeleted),
+// so we resolve a workspaceId instead and query usage at that scope in Path C.
+// Deleted projects have `workspace: null`, so this walks the (non-deleted) list
+// until it finds one that resolves.
+const WORKSPACE_ID_QUERY = `
   query {
     projects {
       edges {
         node {
-          id
+          workspace {
+            id
+          }
         }
       }
     }
   }
 `;
 
-// Path C — resource usage for a single project, converted to USD.
+// Path C — workspace-wide resource usage, converted to USD.
 // estimatedValue is in resource-unit-minutes (vCPU-min, GB-min) — NOT dollars.
 // Apply Railway's per-minute rates to get cost:
 //   CPU:  $20/vCPU/month  → / (30×24×60)
@@ -52,15 +58,27 @@ const RATES: Record<string, number> = {
   DISK_USAGE_GB:    0.15 / MINUTES_PER_MONTH,
   NETWORK_TX_GB:    0.05,   // $/GB flat — already total GB, not per-minute
 };
+const MEASUREMENTS = Object.keys(RATES);
 
-const PROJECT_USAGE_QUERY = (projectId: string) => `
+// includeDeleted: true — a deleted project still owes for usage it incurred earlier
+// in the current billing period, and Railway's own usage dashboard counts it; without
+// this flag it just vanishes from the total.
+//
+// One call per measurement, not one call for all four: Railway fans a workspace-wide
+// estimatedUsage query out internally to (N_projects × N_measurements) concurrent
+// metric queries, and that blows past the ~16–19 concurrent-query limit fast once a
+// workspace has more than a handful of projects. Restricting each call to a single
+// measurement keeps concurrency at N_projects, which is what stays under the limit.
+const WORKSPACE_USAGE_QUERY = (workspaceId: string, measurement: string) => `
   query {
     estimatedUsage(
-      projectId: "${projectId}"
-      measurements: [CPU_USAGE, MEMORY_USAGE_GB, DISK_USAGE_GB, NETWORK_TX_GB]
+      workspaceId: "${workspaceId}"
+      includeDeleted: true
+      measurements: [${measurement}]
     ) {
       estimatedValue
       measurement
+      projectId
     }
   }
 `;
@@ -145,49 +163,60 @@ export class RailwayProvider implements IntegrationProvider {
       throw new Error(billingErr);
     }
 
-    this.logger.log('customer.currentUsage not authorized — switching to per-project estimatedUsage');
+    this.logger.log('customer.currentUsage not authorized — switching to workspace-wide estimatedUsage');
 
-    // ── Path B: get project IDs ───────────────────────────────────────────────
-    const projectsJson = await this.gql(h, PROJECTS_QUERY);
-    const projectsErr = this.firstError(projectsJson);
-
-    if (projectsErr && NOT_AUTHORIZED_RE.test(projectsErr)) {
+    // ── Path B: resolve the workspace ──────────────────────────────────────────
+    const workspaceId = await this.fetchWorkspaceId(h);
+    if (!workspaceId) {
       throw new Error(
         'Railway API token does not have permission to read projects or billing data. ' +
           'Use a personal API token from railway.com → Account Settings → API Tokens.',
       );
     }
-    if (projectsErr) throw new Error(projectsErr);
 
-    const edges: any[] = projectsJson?.data?.projects?.edges ?? [];
-    const projectIds: string[] = edges
-      .map((e: any) => e?.node?.id)
-      .filter(Boolean);
-
-    if (projectIds.length === 0) {
-      this.logger.warn('Railway: no projects found for this token — returning 0');
-      return 0;
-    }
-
-    this.logger.log(`Railway: summing estimatedUsage across ${projectIds.length} project(s) sequentially`);
-
-    // ── Path C: per-project usage — sequential to stay under rate limit ───────
+    // ── Path C: usage per measurement, across every project (incl. deleted) ────
     let total = 0;
-    for (const projectId of projectIds) {
-      total += await this.projectUsage(h, projectId);
+    let succeeded = 0;
+    for (const measurement of MEASUREMENTS) {
+      const result = await this.measurementUsage(h, workspaceId, measurement);
+      if (result.ok) succeeded += 1;
+      total += result.amount;
     }
+
+    // If every single measurement failed (e.g. rate-limited), `total` is not "true
+    // zero usage" — it's "we learned nothing this cycle." Reporting it as $0 would
+    // overwrite the last known-good spend with a false "fully paid down" state.
+    // Fail the sync instead so the previous value is left untouched.
+    if (succeeded === 0) {
+      throw new Error('Railway estimatedUsage failed for every measurement this cycle — leaving last known spend as-is.');
+    }
+
     return total;
   }
 
-  private async projectUsage(
+  /** Deleted projects resolve `workspace: null`, so this walks the list for the first hit. */
+  private async fetchWorkspaceId(h: Record<string, string>): Promise<string | null> {
+    const json = await this.gql(h, WORKSPACE_ID_QUERY);
+    if (this.firstError(json)) return null;
+
+    const edges: any[] = json?.data?.projects?.edges ?? [];
+    for (const e of edges) {
+      const id = e?.node?.workspace?.id;
+      if (id) return id;
+    }
+    return null;
+  }
+
+  private async measurementUsage(
     h: Record<string, string>,
-    projectId: string,
+    workspaceId: string,
+    measurement: string,
     attempt = 1,
-  ): Promise<number> {
+  ): Promise<{ ok: boolean; amount: number }> {
     const resp = await fetch(RAILWAY_GQL, {
       method: 'POST',
       headers: h,
-      body: JSON.stringify({ query: PROJECT_USAGE_QUERY(projectId) }),
+      body: JSON.stringify({ query: WORKSPACE_USAGE_QUERY(workspaceId, measurement) }),
     });
 
     const retryAfterHeader = resp.headers.get('Retry-After');
@@ -201,37 +230,34 @@ export class RailwayProvider implements IntegrationProvider {
           ? Math.min(Number(retryAfterHeader) * 1000, 8_000)
           : 6_000;
         this.logger.warn(
-          `Railway rate limit on project ${projectId} (attempt ${attempt}) — retrying in ${waitMs}ms`,
+          `Railway rate limit on ${measurement} (attempt ${attempt}) — retrying in ${waitMs}ms`,
         );
         await new Promise((r) => setTimeout(r, waitMs));
-        return this.projectUsage(h, projectId, 2);
+        return this.measurementUsage(h, workspaceId, measurement, 2);
       }
 
       if (RATE_LIMIT_RE.test(errMsg)) {
-        // Still rate-limited after retry — skip this project, don't fail the whole sync
+        // Still rate-limited after retry — skip this measurement, don't fail the whole sync
         this.logger.warn(
-          `Railway rate limit persists for project ${projectId} — skipping, will catch on next sync`,
+          `Railway rate limit persists for ${measurement} — skipping, will catch on next sync`,
         );
-        return 0;
+        return { ok: false, amount: 0 };
       }
 
-      // Any other error on a single project — log and skip rather than failing everything
-      this.logger.error(`Railway estimatedUsage error for project ${projectId}: ${errMsg}`);
-      return 0;
+      // Any other error on a single measurement — log and skip rather than failing everything
+      this.logger.error(`Railway estimatedUsage error for ${measurement}: ${errMsg}`);
+      return { ok: false, amount: 0 };
     }
 
     const items: any[] = json?.data?.estimatedUsage ?? [];
-    let subtotal = 0;
-    for (const item of items) {
-      const rate = RATES[item.measurement as string] ?? 0;
-      subtotal += (item.estimatedValue ?? 0) * rate;
-    }
-    this.logger.log(`Railway project ${projectId}: $${subtotal.toFixed(4)} USD`);
-    return subtotal;
+    const rate = RATES[measurement] ?? 0;
+    const subtotal = items.reduce((sum: number, item: any) => sum + (item.estimatedValue ?? 0) * rate, 0);
+    this.logger.log(`Railway ${measurement}: ${items.length} project(s) (incl. deleted), $${subtotal.toFixed(4)} USD`);
+    return { ok: true, amount: subtotal };
   }
 
-  private async gql(h: Record<string, string>, query: string): Promise<any> {
-    const resp = await fetch(RAILWAY_GQL, { method: 'POST', headers: h, body: JSON.stringify({ query }) });
+  private async gql(h: Record<string, string>, query: string, variables?: Record<string, any>): Promise<any> {
+    const resp = await fetch(RAILWAY_GQL, { method: 'POST', headers: h, body: JSON.stringify({ query, variables }) });
     return resp.json();
   }
 
