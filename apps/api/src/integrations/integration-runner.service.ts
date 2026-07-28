@@ -8,30 +8,6 @@ const PROVIDERS: Record<string, IntegrationProvider> = {
   RAILWAY: new RailwayProvider(),
 };
 
-// Frankfurter API — backed by the European Central Bank, free, no key needed.
-const FX_URL = 'https://api.frankfurter.app/latest?from=USD&to=INR';
-const FX_CACHE_TTL_MS = 60 * 60 * 1000; // refresh rate once per hour
-let fxCache: { rate: number; fetchedAt: number } | null = null;
-
-async function getUsdToInr(): Promise<number> {
-  if (fxCache && Date.now() - fxCache.fetchedAt < FX_CACHE_TTL_MS) {
-    return fxCache.rate;
-  }
-  try {
-    const res = await fetch(FX_URL);
-    const json = (await res.json()) as { rates?: { INR?: number } };
-    const rate = json?.rates?.INR;
-    if (rate && rate > 0) {
-      fxCache = { rate, fetchedAt: Date.now() };
-      return rate;
-    }
-  } catch {
-    // fall through to fallback
-  }
-  // Fallback: env var → hardcoded default
-  return Number(process.env.USD_TO_INR) || 84;
-}
-
 @Injectable()
 export class IntegrationRunnerService {
   private readonly logger = new Logger(IntegrationRunnerService.name);
@@ -46,7 +22,7 @@ export class IntegrationRunnerService {
     await Promise.allSettled(integrations.map((i) => this.runOne(i)));
   }
 
-  /** Run a single integration and update the tool's usedAmount + barPct (and capAmount/alertThresholdPct, if the provider exposes a budget). */
+  /** Run a single integration and update the tool's usedAmount + barPct (and capAmount/alertThresholdPct, if the provider exposes a budget). All amounts are USD — the app's base currency. */
   async runOne(integration: { id: string; toolId: string; provider: string; config: any }) {
     const provider = PROVIDERS[integration.provider];
     if (!provider) {
@@ -57,9 +33,6 @@ export class IntegrationRunnerService {
     try {
       const config    = integration.config as Record<string, any>;
       const amountUSD = await provider.fetchSpendUSD(config);
-      const usdToInr  = await getUsdToInr();
-      const amountINR = amountUSD * usdToInr;
-      this.logger.log(`FX rate: $1 = ₹${usdToInr.toFixed(2)} · $${amountUSD.toFixed(4)} = ₹${amountINR.toFixed(2)}`);
 
       // Pull the latest budget cap too, if this provider can report one — keeps the
       // dashboard's cap in sync with whatever's configured on the provider's side,
@@ -84,28 +57,26 @@ export class IntegrationRunnerService {
           select: { capAmount: true, alertThresholdPct: true },
         });
 
-        const capAmount = hardLimitUSD !== null
-          ? Math.round(hardLimitUSD * usdToInr)
-          : Number(tool?.capAmount ?? 0);
+        const capAmount = hardLimitUSD ?? Number(tool?.capAmount ?? 0);
         const alertThresholdPct = hardLimitUSD !== null && softLimitUSD !== null
           ? Math.round((softLimitUSD / hardLimitUSD) * 100)
           : tool?.alertThresholdPct;
         const barPct = capAmount > 0
-          ? Math.min(100, Math.round((amountINR / capAmount) * 100))
+          ? Math.min(100, Math.round((amountUSD / capAmount) * 100))
           : 0;
 
         await tx.tool.update({
           where: { id: integration.toolId },
-          data: { usedAmount: amountINR, barPct, capAmount, alertThresholdPct },
+          data: { usedAmount: amountUSD, barPct, capAmount, alertThresholdPct },
         });
         await tx.toolIntegration.update({
           where: { id: integration.id },
-          data: { lastSyncAt: new Date(), lastSyncAmountINR: amountINR, lastError: null },
+          data: { lastSyncAt: new Date(), lastSyncAmountUSD: amountUSD, lastError: null },
         });
       });
 
-      const capLog = hardLimitUSD !== null ? ` · cap ₹${Math.round(hardLimitUSD * usdToInr).toLocaleString('en-IN')}` : '';
-      this.logger.log(`Synced ${integration.provider} → tool ${integration.toolId}: ₹${amountINR.toFixed(2)}${capLog}`);
+      const capLog = hardLimitUSD !== null ? ` · cap $${hardLimitUSD.toLocaleString('en-US')}` : '';
+      this.logger.log(`Synced ${integration.provider} → tool ${integration.toolId}: $${amountUSD.toFixed(2)}${capLog}`);
     } catch (err: any) {
       this.logger.error(`Sync failed for ${integration.provider} (tool ${integration.toolId}): ${err.message}`);
       await this.prisma.toolIntegration.update({

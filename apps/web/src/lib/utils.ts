@@ -5,8 +5,9 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function fmt(n: number, currency = '₹'): string {
-  return `${currency}${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+export function fmt(n: number, currency = '$'): string {
+  const locale = currency === '₹' ? 'en-IN' : 'en-US';
+  return `${currency}${Number(n).toLocaleString(locale, { maximumFractionDigits: 2 })}`;
 }
 
 export function fmtDate(d: string | Date): string {

@@ -129,7 +129,7 @@ model Organization {
   id        String    @id @default(uuid())
   name      String
   slug      String    @unique
-  currency  Currency  @default(INR)
+  currency  Currency  @default(USD)
   planTier  PlanTier  @default(FREE)
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
@@ -254,9 +254,9 @@ model Tool {
   vendor            String       @default("")
   category          ToolCategory @default(OTHER)
   paymentKind       PaymentKind  @default(NOBUDGET)
-  monthlyAmount     Float        @default(0)
-  usedAmount        Float        @default(0)
-  capAmount         Float        @default(0)
+  monthlyAmount     Float        @default(0) // USD
+  usedAmount        Float        @default(0) // USD
+  capAmount         Float        @default(0) // USD
   barPct            Float        @default(0)
   alertThresholdPct Float        @default(80)
   triggerEmail      String?
@@ -290,7 +290,7 @@ model ToolIntegration {
   config            Json      // provider-specific credentials & settings
   syncEveryMinutes  Int       @default(15)
   lastSyncAt        DateTime?
-  lastSyncAmountINR Float?
+  lastSyncAmountUSD Float?
   lastError         String?
   isActive          Boolean   @default(true)
   createdAt         DateTime  @default(now())
@@ -336,9 +336,9 @@ model Budget {
   periodType      BudgetPeriodType
   periodStart     DateTime
   periodEnd       DateTime
-  allocatedAmount Float
-  reservedAmount  Float           @default(0)
-  spentAmount     Float           @default(0)
+  allocatedAmount Float // USD
+  reservedAmount  Float           @default(0) // USD
+  spentAmount     Float           @default(0) // USD
   isLocked        Boolean         @default(false)
   rolloverEnabled Boolean         @default(false)
   createdAt       DateTime        @default(now())
@@ -355,8 +355,8 @@ model Budget {
 model BudgetRevision {
   id              String   @id @default(uuid())
   budgetId        String
-  previousAmount  Float
-  newAmount       Float
+  previousAmount  Float // USD
+  newAmount       Float // USD
   reason          String   @default("")
   revisedByUserId String
   createdAt       DateTime @default(now())
@@ -380,8 +380,8 @@ model SpendRequest {
   description          String             @default("")
   category             ToolCategory       @default(OTHER)
   vendorName           String             @default("")
-  estimatedAmount      Float
-  currency             Currency           @default(INR)
+  estimatedAmount      Float // USD
+  currency             Currency           @default(USD)
   businessJustification String            @default("")
   status               SpendRequestStatus @default(DRAFT)
   workflowId           String?
@@ -435,7 +435,7 @@ model ApprovalStep {
   approverType          ApproverType    @default(ROLE)
   approverId            String?
   approverRole          MemberRole?
-  autoApproveBelowAmount Float?
+  autoApproveBelowAmount Float? // USD
   escalationHours       Int             @default(48)
   escalationToUserId    String?
   createdAt             DateTime        @default(now())
@@ -453,7 +453,7 @@ model ApprovalAction {
   approverId     String
   action         ApprovalActionType
   comment        String             @default("")
-  approvedAmount Float?
+  approvedAmount Float? // USD
   createdAt      DateTime           @default(now())
 
   spendRequest SpendRequest @relation(fields: [spendRequestId], references: [id])
@@ -490,7 +490,7 @@ model BillingRecord {
   toolSnapshotJson Json?         // preserved even after tool deletion
   monthKey         String        // YYYY-MM
   monthLabel       String        // e.g. "Jun 2026"
-  amount           Float
+  amount           Float // USD
   status           BillingStatus @default(PENDING)
   paidAt           DateTime?
   paidByUserId     String?

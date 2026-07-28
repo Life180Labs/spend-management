@@ -33,7 +33,7 @@ export class SpendRequestsService {
         category: (dto.category as any) || 'OTHER',
         vendorName: dto.vendorName || '',
         estimatedAmount: dto.estimatedAmount,
-        currency: (dto.currency as any) || 'INR',
+        currency: (dto.currency as any) || 'USD',
         businessJustification: dto.businessJustification || '',
         status: 'DRAFT',
       },

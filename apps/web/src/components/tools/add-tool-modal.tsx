@@ -27,9 +27,8 @@ interface ExistingTool {
 }
 
 interface Limits {
-  computeHardLimitINR: number; computeSoftLimitINR: number;
   computeHardLimitUSD: number; computeSoftLimitUSD: number;
-  alertThresholdPct: number; fxRate: number;
+  alertThresholdPct: number;
 }
 
 interface Props {
@@ -194,7 +193,7 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
       const res = await api.get<Limits | null>(`/integrations/${tool.id}/limits`);
       if (res) {
         setRefreshed(res);
-        setCapAmount(String(res.computeHardLimitINR));
+        setCapAmount(String(res.computeHardLimitUSD));
         setAlertPct(String(res.alertThresholdPct));
       } else {
         setRefreshErr('Could not pull limits from provider.');
@@ -239,7 +238,7 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
 
     setError(''); setLoading(true);
     try {
-      const cap   = mode === 'api' && limits ? limits.computeHardLimitINR : (capAmount ? Number(capAmount) : undefined);
+      const cap   = mode === 'api' && limits ? limits.computeHardLimitUSD : (capAmount ? Number(capAmount) : undefined);
       const alert = mode === 'api' && limits ? limits.alertThresholdPct   : (paymentKind === 'PREPAID' ? Number(alertPct) : undefined);
 
       const payload: any = {
@@ -420,8 +419,8 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
                   )}
                   {fetchStatus === 'ok' && limits && (
                     <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <LimitTile label="Budget cap" main={`₹${limits.computeHardLimitINR.toLocaleString('en-IN')}`} sub={`$${limits.computeHardLimitUSD.toFixed(2)}`} />
-                      <LimitTile label="Alert at" main={`${limits.alertThresholdPct}% of cap`} sub={`₹${limits.computeSoftLimitINR.toLocaleString('en-IN')}`} />
+                      <LimitTile label="Budget cap" main={`$${limits.computeHardLimitUSD.toLocaleString('en-US')}`} sub="hard limit" />
+                      <LimitTile label="Alert at" main={`${limits.alertThresholdPct}% of cap`} sub={`$${limits.computeSoftLimitUSD.toLocaleString('en-US')}`} />
                     </div>
                   )}
                 </div>
@@ -431,7 +430,7 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
               {mode === 'manual' && (
                 <div style={{ ...S.row2 }}>
                   <div>
-                    <label style={S.label}>Budget cap (₹) *</label>
+                    <label style={S.label}>Budget cap ($) *</label>
                     <input type="number" min={1} value={capAmount} onChange={(e) => setCapAmount(e.target.value)}
                       placeholder="e.g. 1000" style={S.input} />
                   </div>
@@ -464,16 +463,16 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
                   {refreshErr && <div style={{ fontSize: 11, color: '#f87171', marginTop: 6 }}>{refreshErr}</div>}
                   {refreshed && (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
-                      <LimitTile label="Budget cap" main={`₹${refreshed.computeHardLimitINR.toLocaleString('en-IN')}`} sub={`$${refreshed.computeHardLimitUSD.toFixed(2)}`} />
-                      <LimitTile label="Alert at" main={`${refreshed.alertThresholdPct}%`} sub={`₹${refreshed.computeSoftLimitINR.toLocaleString('en-IN')}`} />
+                      <LimitTile label="Budget cap" main={`$${refreshed.computeHardLimitUSD.toLocaleString('en-US')}`} sub="hard limit" />
+                      <LimitTile label="Alert at" main={`${refreshed.alertThresholdPct}%`} sub={`$${refreshed.computeSoftLimitUSD.toLocaleString('en-US')}`} />
                     </div>
                   )}
                 </div>
               )}
               <div style={S.row2}>
                 <div>
-                  <label style={S.label}>Budget cap (₹)</label>
-                  <div style={S.lockedInput}>₹{Number(capAmount).toLocaleString('en-IN')}</div>
+                  <label style={S.label}>Budget cap ($)</label>
+                  <div style={S.lockedInput}>${Number(capAmount).toLocaleString('en-US')}</div>
                 </div>
                 <div>
                   <label style={S.label}>Alert threshold</label>
@@ -487,12 +486,12 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
           {paymentKind === 'MOSUB' && (
             <div>
               <div style={S.sectionTitle}>Budget</div>
-              <label style={S.label}>Monthly amount (₹)</label>
+              <label style={S.label}>Monthly amount ($)</label>
               {isEdit ? (
-                <div style={S.lockedInput}>₹{Number(monthlyAmount).toLocaleString('en-IN')}</div>
+                <div style={S.lockedInput}>${Number(monthlyAmount).toLocaleString('en-US')}</div>
               ) : (
                 <input type="number" min={1} value={monthlyAmount} onChange={(e) => setMonthlyAmount(e.target.value)}
-                  placeholder="e.g. 9600" style={S.input} />
+                  placeholder="e.g. 100" style={S.input} />
               )}
             </div>
           )}

@@ -222,7 +222,7 @@ export class ApprovalEngine {
         userId,
         type: 'THRESHOLD_BREACH',
         title: `Approval needed: ${req.title}`,
-        body: `${req.requester?.name} has submitted a spend request for ₹${req.estimatedAmount.toLocaleString('en-IN')}`,
+        body: `${req.requester?.name} has submitted a spend request for $${req.estimatedAmount.toLocaleString('en-US')}`,
         metadataJson: { requestId: req.id },
       });
     }

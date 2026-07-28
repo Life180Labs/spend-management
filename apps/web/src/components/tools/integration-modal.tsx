@@ -11,18 +11,15 @@ interface Integration {
   config: Record<string, any>;
   isActive: boolean;
   lastSyncAt: string | null;
-  lastSyncAmountINR: number | null;
+  lastSyncAmountUSD: number | null;
   lastError: string | null;
   syncEveryMinutes: number;
 }
 
 interface RailwayLimits {
-  computeHardLimitINR: number;
-  computeSoftLimitINR: number;
   computeHardLimitUSD: number;
   computeSoftLimitUSD: number;
   alertThresholdPct: number;
-  fxRate: number;
 }
 
 interface Props {
@@ -75,7 +72,7 @@ export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props)
           const limits = await api.get<RailwayLimits | null>(`/integrations/${toolId}/limits`);
           if (limits) {
             await api.patch(`/tools/${toolId}`, {
-              capAmount: limits.computeHardLimitINR,
+              capAmount: limits.computeHardLimitUSD,
               alertThresholdPct: limits.alertThresholdPct,
             });
             setAppliedLimits(limits);
@@ -119,6 +116,19 @@ export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props)
     } finally {
       setRemoving(false);
     }
+  }
+
+  function friendlyError(raw: string): string {
+    if (/failed for every measurement this cycle/i.test(raw)) {
+      return "Railway is temporarily rate-limiting our requests — we kept your last known spend and will try again on the next sync.";
+    }
+    if (/does not have permission to read projects or billing data/i.test(raw)) {
+      return "This API token can't read usage data. Use a personal API token from railway.com → Account Settings → API Tokens.";
+    }
+    if (/rate limit/i.test(raw)) {
+      return "Railway is rate-limiting our requests right now — this will resolve itself on the next sync.";
+    }
+    return raw;
   }
 
   function fmtSyncTime(iso: string) {
@@ -174,15 +184,18 @@ export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props)
                     <span style={{ fontSize: 11, color: '#4a7a4a' }}>Synced {fmtSyncTime(integration.lastSyncAt)}</span>
                   )}
                 </div>
-                {integration.lastSyncAmountINR != null && (
+                {integration.lastSyncAmountUSD != null && (
                   <div style={{ marginTop: 5, fontSize: 12, color: '#5d9a5d' }}>
-                    Last fetched: <span style={{ fontWeight: 650, color: '#8fcf8f' }}>₹{Number(integration.lastSyncAmountINR).toLocaleString('en-IN')}</span>
+                    Last fetched: <span style={{ fontWeight: 650, color: '#8fcf8f' }}>${Number(integration.lastSyncAmountUSD).toLocaleString('en-US')}</span>
                   </div>
                 )}
                 {integration.lastError && (
-                  <div style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 11.5, color: '#F85149' }}>
+                  <div
+                    style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 11.5, color: '#F85149' }}
+                    title={integration.lastError}
+                  >
                     <AlertCircle size={12} style={{ marginTop: 1, flexShrink: 0 }} />
-                    <span>Sync error: {integration.lastError}</span>
+                    <span>{friendlyError(integration.lastError)}</span>
                   </div>
                 )}
               </div>
@@ -200,11 +213,11 @@ export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props)
                   <span style={{ fontSize: 12, fontWeight: 650, color: '#9aa2ef' }}>Budget synced from Railway</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px' }}>
-                  <LimitRow label="Budget cap" inr={appliedLimits.computeHardLimitINR} usd={appliedLimits.computeHardLimitUSD} />
-                  <LimitRow label="Alert threshold" inr={appliedLimits.computeSoftLimitINR} usd={appliedLimits.computeSoftLimitUSD} pct={appliedLimits.alertThresholdPct} />
+                  <LimitRow label="Budget cap" usd={appliedLimits.computeHardLimitUSD} />
+                  <LimitRow label="Alert threshold" usd={appliedLimits.computeSoftLimitUSD} pct={appliedLimits.alertThresholdPct} />
                 </div>
                 <div style={{ marginTop: 8, fontSize: 10.5, color: '#5e6480' }}>
-                  Based on your Railway compute hard limit · 1 USD = ₹{appliedLimits.fxRate.toFixed(1)}
+                  Based on your Railway compute hard limit
                 </div>
               </div>
             )}
@@ -308,13 +321,12 @@ export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props)
   );
 }
 
-function LimitRow({ label, inr, usd, pct }: { label: string; inr: number; usd: number; pct?: number }) {
+function LimitRow({ label, usd, pct }: { label: string; usd: number; pct?: number }) {
   return (
     <div>
       <div style={{ fontSize: 10.5, color: '#5e6480', marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 12.5, fontWeight: 650, color: '#c2c6cf' }}>
-        ₹{inr.toLocaleString('en-IN')}
-        <span style={{ fontSize: 10.5, fontWeight: 400, color: '#5e6480', marginLeft: 5 }}>(${usd})</span>
+        ${usd.toLocaleString('en-US')}
         {pct !== undefined && <span style={{ fontSize: 10.5, fontWeight: 600, color: '#9aa2ef', marginLeft: 6 }}>at {pct}%</span>}
       </div>
     </div>

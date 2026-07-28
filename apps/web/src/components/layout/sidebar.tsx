@@ -33,7 +33,7 @@ export function Sidebar() {
   const [kpis, setKpis] = useState<KPIMin | null>(null);
   const [userMenu, setUserMenu] = useState(false);
   const [user, setUser] = useState<{ name: string; email: string; initials: string } | null>(null);
-  const [currency, setCurrency] = useState<'INR' | 'USD'>('INR');
+  const [currency, setCurrency] = useState<'INR' | 'USD'>('USD');
   const [fxRate, setFxRate] = useState(94.4);
 
   useEffect(() => {
@@ -69,10 +69,10 @@ export function Sidebar() {
   const budgetPct = kpis ? Math.min(100, Math.round((kpis.totalMonthlySpend / 175000) * 100)) : 71;
 
   const fmtSpend = (amount: number) => {
-    if (currency === 'INR') {
-      return `₹${Number(amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+    if (currency === 'USD') {
+      return `$${Number(amount).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
     }
-    return `$${(amount / fxRate).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+    return `₹${(amount * fxRate).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
   };
 
   return (

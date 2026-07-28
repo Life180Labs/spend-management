@@ -38,7 +38,7 @@ export class AuthService {
       data: {
         name: dto.orgName || `${dto.name}'s Workspace`,
         slug: this.slugify(dto.orgName || dto.name),
-        currency: 'INR',
+        currency: 'USD',
         users: {
           create: {
             email: dto.email,

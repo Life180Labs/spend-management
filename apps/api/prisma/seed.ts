@@ -10,7 +10,7 @@ async function main() {
     create: {
       name: 'Default Organization',
       slug: 'default-org',
-      currency: 'INR',
+      currency: 'USD',
       planTier: 'PRO',
     },
   });

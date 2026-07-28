@@ -23,7 +23,7 @@ export default function ReportsPage() {
   const [billing, setBilling] = useState<BillingRecord[]>([]);
   const [monthSummary, setMonthSummary] = useState<MonthSummary[]>([]);
   const [monthFilter, setMonthFilter] = useState<string>('all');
-  const [currency, setCurrency] = useState<'INR' | 'USD'>('INR');
+  const [currency, setCurrency] = useState<'INR' | 'USD'>('USD');
   const [fxRate, setFxRate] = useState(94.4);
 
   useEffect(() => {
@@ -49,15 +49,15 @@ export default function ReportsPage() {
   const filteredBilling = monthFilter === 'all' ? billing : billing.filter((r) => r.monthKey === monthFilter);
   const filteredTotal = filteredBilling.reduce((s, r) => s + r.amount, 0);
 
-  const fmtAmt = (n: number) => currency === 'INR'
+  const fmtAmt = (n: number) => currency === 'USD'
     ? fmt(n)
-    : `$${(n / fxRate).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+    : `₹${(n * fxRate).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
   const reportStats = [
     { label: 'Total Monthly Spend', value: fmtAmt(totalSpend), sub: 'this period' },
     { label: 'Tracked Tools', value: String(toolCount), sub: 'with billing records' },
     { label: 'Categories', value: String(categories.length), sub: 'active categories' },
-    { label: 'Avg / Tool', value: toolCount ? fmtAmt(Math.round(totalSpend / toolCount)) : `${currency === 'INR' ? '₹' : '$'}0`, sub: 'per month' },
+    { label: 'Avg / Tool', value: toolCount ? fmtAmt(Math.round(totalSpend / toolCount)) : `${currency === 'USD' ? '$' : '₹'}0`, sub: 'per month' },
   ];
 
   return (
@@ -108,7 +108,7 @@ export default function ReportsPage() {
                 <div key={c.category}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
                     <span style={{ fontSize: 12.5, fontWeight: 550, color: '#cfd3da' }}>{CAT_LABELS[c.category] || c.category}</span>
-                    <span style={{ fontSize: 12.5, fontWeight: 650, color: '#F2F3F5' }}>{fmt(c.total)}</span>
+                    <span style={{ fontSize: 12.5, fontWeight: 650, color: '#F2F3F5' }}>{fmtAmt(c.total)}</span>
                   </div>
                   <div style={{ height: 9, borderRadius: 999, background: '#16191F', overflow: 'hidden' }}>
                     <div style={{ height: '100%', borderRadius: 999, width: `${c.pct}%`, background: 'linear-gradient(90deg,#5E6AD2,#8B5CF6)' }} />

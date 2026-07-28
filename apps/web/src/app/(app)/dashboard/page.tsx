@@ -20,11 +20,11 @@ interface KPIs {
 interface Tool {
   id: string; name: string; vendor: string; category: string;
   paymentKind: string; monoInitials: string; monoBgColor: string;
-  usedAmount: number; capAmount: number; monthlyAmount: number;
+  usedAmount: number; capAmount: number; monthlyAmount: number; // USD — the app's base currency
   barPct: number; alertThresholdPct: number; alert: boolean;
   statusSub: string; triggerEmail: string | null;
   renewalDate: string | null; daysUntilRenewal: number | null;
-  integration: { provider: string; lastSyncAt: string | null; lastSyncAmountINR: number | null; isActive: boolean; lastError: string | null } | null;
+  integration: { provider: string; lastSyncAt: string | null; lastSyncAmountUSD: number | null; isActive: boolean; lastError: string | null } | null;
 }
 
 const CAT_LABELS: Record<string, string> = {
@@ -43,11 +43,13 @@ const GRID = 'minmax(200px,2.1fr) 1.15fr 1fr 1.95fr 1.7fr 1.15fr 60px';
 const HEADERS = ['Tool', 'Category', 'Payment', 'Budget Status', 'Alert / Renewal Trigger', 'Next Renewal', 'Actions'];
 
 function makeFmt(currency: 'INR' | 'USD', fxRate: number) {
-  return (inrAmount: number) => {
-    if (currency === 'INR') {
-      return `₹${Number(inrAmount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+  // Every stored amount is USD-native — the app's base currency. USD display
+  // needs no conversion; INR is derived on the fly from the live FX rate.
+  return (usdAmount: number) => {
+    if (currency === 'USD') {
+      return `$${Number(usdAmount).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
     }
-    return `$${(inrAmount / fxRate).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+    return `₹${(usdAmount * fxRate).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
   };
 }
 
@@ -97,7 +99,7 @@ export default function DashboardPage() {
   const [integrationTool, setIntegrationTool] = useState<Tool | null>(null);
   const [toast, setToast] = useState('');
   const [currency, setCurrency] = useState<'INR' | 'USD'>(
-    () => (typeof window !== 'undefined' ? (localStorage.getItem('spend_currency') as 'INR' | 'USD' | null) : null) ?? 'INR'
+    () => (typeof window !== 'undefined' ? (localStorage.getItem('spend_currency') as 'INR' | 'USD' | null) : null) ?? 'USD'
   );
   const [fxRate, setFxRate] = useState(94.4);
 

@@ -58,7 +58,12 @@ const RATES: Record<string, number> = {
   DISK_USAGE_GB:    0.15 / MINUTES_PER_MONTH,
   NETWORK_TX_GB:    0.05,   // $/GB flat — already total GB, not per-minute
 };
-const MEASUREMENTS = Object.keys(RATES);
+
+// The hard/soft limit we compare against (fetchLimitsUSD's usageLimit.hardLimit) is
+// Railway's "Compute Usage Limit" specifically — CPU + memory only. Disk and network
+// egress are billed separately and don't count against it. Summing all four measurements
+// here would overstate spend relative to that limit, so only compute goes into the total.
+const MEASUREMENTS = ['CPU_USAGE', 'MEMORY_USAGE_GB'];
 
 // includeDeleted: true — a deleted project still owes for usage it incurred earlier
 // in the current billing period, and Railway's own usage dashboard counts it; without

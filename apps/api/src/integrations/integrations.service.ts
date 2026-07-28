@@ -3,8 +3,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IntegrationRunnerService } from './integration-runner.service';
 import { RailwayProvider } from './providers/railway.provider';
 
-const FX_URL = 'https://api.frankfurter.app/latest?from=USD&to=INR';
-
 @Injectable()
 export class IntegrationsService {
   constructor(
@@ -60,25 +58,12 @@ export class IntegrationsService {
     const limits = await provider.fetchLimitsUSD(integration.config as Record<string, any>);
     if (!limits) return null;
 
-    // Fetch live FX rate
-    let fxRate = Number(process.env.USD_TO_INR) || 84;
-    try {
-      const res = await fetch(FX_URL);
-      const json = (await res.json()) as { rates?: { INR?: number } };
-      if (json?.rates?.INR) fxRate = json.rates.INR;
-    } catch { /* use fallback */ }
-
     return {
-      computeHardLimitINR:  Math.round(limits.computeHardLimitUSD  * fxRate),
-      computeSoftLimitINR:  Math.round(limits.computeSoftLimitUSD  * fxRate),
-      agentHardLimitINR:    Math.round(limits.agentHardLimitUSD    * fxRate),
-      agentSoftLimitINR:    Math.round(limits.agentSoftLimitUSD    * fxRate),
-      computeHardLimitUSD:  limits.computeHardLimitUSD,
-      computeSoftLimitUSD:  limits.computeSoftLimitUSD,
+      computeHardLimitUSD: limits.computeHardLimitUSD,
+      computeSoftLimitUSD: limits.computeSoftLimitUSD,
       alertThresholdPct: limits.computeHardLimitUSD > 0
         ? Math.round((limits.computeSoftLimitUSD / limits.computeHardLimitUSD) * 100)
         : 80,
-      fxRate,
     };
   }
 
@@ -89,22 +74,12 @@ export class IntegrationsService {
     const limits = await railwayProvider.fetchLimitsUSD(config);
     if (!limits) return null;
 
-    let fxRate = Number(process.env.USD_TO_INR) || 84;
-    try {
-      const res = await fetch(FX_URL);
-      const json = (await res.json()) as { rates?: { INR?: number } };
-      if (json?.rates?.INR) fxRate = json.rates.INR;
-    } catch { /* use fallback */ }
-
     return {
-      computeHardLimitINR: Math.round(limits.computeHardLimitUSD * fxRate),
-      computeSoftLimitINR: Math.round(limits.computeSoftLimitUSD * fxRate),
       computeHardLimitUSD: limits.computeHardLimitUSD,
       computeSoftLimitUSD: limits.computeSoftLimitUSD,
       alertThresholdPct: limits.computeHardLimitUSD > 0
         ? Math.round((limits.computeSoftLimitUSD / limits.computeHardLimitUSD) * 100)
         : 80,
-      fxRate,
     };
   }
 

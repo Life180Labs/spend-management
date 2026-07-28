@@ -34,10 +34,10 @@ export function exportSpendAnalysis(
   fxRate: number,
 ) {
   const fmt = (n: number) =>
-    currency === 'INR'
-      ? Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })
-      : (n / fxRate).toLocaleString('en-US', { maximumFractionDigits: 2 });
-  const sym = currency === 'INR' ? '₹' : '$';
+    currency === 'USD'
+      ? Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 })
+      : (n * fxRate).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  const sym = currency === 'USD' ? '$' : '₹';
 
   const summaryData = stats.map((s) => ({ Metric: s.label, Value: s.value }));
   const summaryWs = sheet(summaryData);
@@ -75,10 +75,10 @@ export function exportBillingHistory(
   fxRate: number,
 ) {
   const fmt = (n: number) =>
-    currency === 'INR'
-      ? Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })
-      : (n / fxRate).toLocaleString('en-US', { maximumFractionDigits: 2 });
-  const sym = currency === 'INR' ? '₹' : '$';
+    currency === 'USD'
+      ? Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 })
+      : (n * fxRate).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  const sym = currency === 'USD' ? '$' : '₹';
 
   const data = rows.map((r) => ({
     Tool: r.tool?.name || 'Deleted tool',
@@ -118,10 +118,10 @@ export function exportToolsList(
   fxRate: number,
 ) {
   const fmt = (n: number) =>
-    currency === 'INR'
-      ? Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })
-      : (n / fxRate).toLocaleString('en-US', { maximumFractionDigits: 2 });
-  const sym = currency === 'INR' ? '₹' : '$';
+    currency === 'USD'
+      ? Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 })
+      : (n * fxRate).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  const sym = currency === 'USD' ? '$' : '₹';
 
   const data = tools.map((t) => {
     const used = t.paymentKind === 'PREPAID' || t.paymentKind === 'CAPSUB'

@@ -99,7 +99,7 @@ export class MailService {
               <div style="height:8px;border-radius:999px;background:#1B1E26;margin-top:14px;overflow:hidden">
                 <div style="height:100%;width:${Math.min(100, barPct)}%;border-radius:999px;background:${barColor}"></div>
               </div>
-              ${capAmount ? `<div style="font-size:11px;color:#6b707b;margin-top:8px">Budget cap: ₹${capAmount.toLocaleString('en-IN')}</div>` : ''}
+              ${capAmount ? `<div style="font-size:11px;color:#6b707b;margin-top:8px">Budget cap: $${capAmount.toLocaleString('en-US')}</div>` : ''}
             </td></tr>
           </table>
 
@@ -158,7 +158,7 @@ export class MailService {
                   </td>
                 </tr>
                 ${monthlyAmount ? `<tr><td colspan="2" style="padding-top:14px;border-top:1px solid #1A1D24">
-                  <div style="font-size:13px;color:#9aa0ab">Monthly charge: <strong style="color:#F2F3F5">₹${monthlyAmount.toLocaleString('en-IN')}</strong></div>
+                  <div style="font-size:13px;color:#9aa0ab">Monthly charge: <strong style="color:#F2F3F5">$${monthlyAmount.toLocaleString('en-US')}</strong></div>
                 </td></tr>` : ''}
               </table>
             </td></tr>
