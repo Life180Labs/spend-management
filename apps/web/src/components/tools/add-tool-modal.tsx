@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { INTEGRATION_PROVIDERS } from '@/lib/integration-providers';
 
 /* ─── constants ─────────────────────────────────────────────────────────── */
 
@@ -35,6 +36,8 @@ interface Props {
   onClose: () => void;
   onCreated: (tool: any) => void;
   tool?: ExistingTool;
+  /** Providers that already have an active integration on another tool - no point connecting them again, so they're shown disabled in the dropdown. */
+  connectedProviders?: Set<string>;
 }
 
 /* ─── shared styles ──────────────────────────────────────────────────────── */
@@ -123,7 +126,7 @@ const S = {
    AddToolModal
 ═══════════════════════════════════════════════════════════════════════════ */
 
-export function AddToolModal({ onClose, onCreated, tool }: Props) {
+export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: Props) {
   const isEdit = !!tool;
   const hasIntegration = isEdit && !!tool?.integration;
   const provider = tool?.integration?.provider ?? null;
@@ -145,10 +148,21 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
 
   /* ── add-mode setup ─────────────────────────────────────────────────── */
   const [mode, setMode] = useState<'api' | 'manual'>('api');
+  const [connectProvider, setConnectProvider] = useState(
+    () => (INTEGRATION_PROVIDERS.find((p) => !connectedProviders?.has(p.value)) ?? INTEGRATION_PROVIDERS[0]).value,
+  );
+  const selectedIntegration = INTEGRATION_PROVIDERS.find((p) => p.value === connectProvider) ?? INTEGRATION_PROVIDERS[0];
   const [apiKey, setApiKey] = useState('');
   const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'ok' | 'err'>('idle');
   const [fetchError, setFetchError] = useState('');
   const [limits, setLimits] = useState<Limits | null>(null);
+
+  // Vendor is implied by the selected integration in "Connect account" mode -
+  // auto-fill and lock it there instead of asking the user to retype it.
+  const vendorLocked = !isEdit && paymentKind === 'PREPAID' && mode === 'api';
+  useEffect(() => {
+    if (vendorLocked) setVendor(selectedIntegration.vendor);
+  }, [vendorLocked, connectProvider]);
 
   /* ── edit-mode refresh ──────────────────────────────────────────────── */
   const [refreshing, setRefreshing] = useState(false);
@@ -169,15 +183,21 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
     setFetchStatus('loading'); setFetchError('');
     try {
       const res = await api.post<Limits | null>('/integrations/preview-limits', {
-        provider: 'RAILWAY',
-        config: { apiToken: key },
+        provider: selectedIntegration.value,
+        config: { [selectedIntegration.tokenKey]: key },
       });
       if (res) {
         setLimits(res);
         setFetchStatus('ok');
+      } else if (!selectedIntegration.hasLimits) {
+        // This provider doesn't expose a spend limit via API (nothing to preview) -
+        // budget cap is entered manually below instead; the key itself is only
+        // actually validated when the integration syncs after the tool is created.
+        setLimits(null);
+        setFetchStatus('ok');
       } else {
         setFetchStatus('err');
-        setFetchError('No limits returned - make sure your Railway account has usage limits set.');
+        setFetchError(`No limits returned - make sure your ${selectedIntegration.label} account has usage limits set.`);
       }
     } catch (e: any) {
       setFetchStatus('err');
@@ -226,8 +246,11 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
     if (!name.trim()) { setError('Tool name is required'); return; }
     if (!vendor.trim()) { setError('Vendor is required'); return; }
     if (needsEmail && !emailUser.trim()) { setError('Notification email is required'); return; }
-    if (paymentKind === 'PREPAID' && mode === 'api' && fetchStatus !== 'ok') {
+    if (paymentKind === 'PREPAID' && mode === 'api' && selectedIntegration.hasLimits && fetchStatus !== 'ok') {
       setError('Fetch limits from your provider before saving.'); return;
+    }
+    if (paymentKind === 'PREPAID' && mode === 'api' && !selectedIntegration.hasLimits && !capAmount) {
+      setError('Budget cap is required.'); return;
     }
     if (mode === 'manual' && paymentKind === 'PREPAID' && !capAmount) {
       setError('Budget cap is required.'); return;
@@ -255,8 +278,8 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
       if (mode === 'api' && apiKey.trim()) {
         try {
           await api.put(`/integrations/${result.id}`, {
-            provider: 'RAILWAY',
-            config: { apiToken: apiKey.trim() },
+            provider: selectedIntegration.value,
+            config: { [selectedIntegration.tokenKey]: apiKey.trim() },
           });
         } catch { /* best-effort */ }
       }
@@ -302,6 +325,32 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
           {error && <div style={S.error}>{error}</div>}
 
           {/* ══════════════════════════════════════════════════════════
+              0. INTEGRATION - pick this first, it drives Vendor/budget below
+          ══════════════════════════════════════════════════════════ */}
+          {!isEdit && paymentKind === 'PREPAID' && mode === 'api' && (
+            <div>
+              <label style={S.label}>Integration</label>
+              <select
+                value={connectProvider}
+                onChange={(e) => {
+                  setConnectProvider(e.target.value);
+                  setApiKey(''); setFetchStatus('idle'); setLimits(null); setFetchError('');
+                }}
+                style={S.select}
+              >
+                {INTEGRATION_PROVIDERS.map((p) => {
+                  const connected = connectedProviders?.has(p.value);
+                  return (
+                    <option key={p.value} value={p.value} disabled={connected}>
+                      {p.label}{connected ? ' (already connected)' : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════
               1. TOOL DETAILS - always first
           ══════════════════════════════════════════════════════════ */}
           <div>
@@ -318,7 +367,7 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
               </div>
               <div>
                 <label style={S.label}>Vendor</label>
-                {isEdit ? (
+                {isEdit || vendorLocked ? (
                   <div style={S.lockedInput}>{vendor}</div>
                 ) : (
                   <input value={vendor} onChange={(e) => setVendor(e.target.value)}
@@ -385,12 +434,12 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
               {/* Connect account panel */}
               {mode === 'api' && (
                 <div style={{ backgroundColor: '#0f1116', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '16px 16px 14px' }}>
-                  <label style={S.label}>API key / service account token</label>
+                  <label style={S.label}>{selectedIntegration.tokenLabel}</label>
                   <input
                     type="text"
                     value={apiKey}
                     onChange={(e) => { setApiKey(e.target.value); setFetchStatus('idle'); setLimits(null); }}
-                    placeholder="Paste your API key here"
+                    placeholder={selectedIntegration.placeholder}
                     autoComplete="off"
                     spellCheck={false}
                     style={{ ...S.input, marginBottom: 10, fontFamily: 'monospace', letterSpacing: '0.03em' }}
@@ -406,10 +455,14 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
                         borderRadius: 7, cursor: (!apiKey.trim() || fetchStatus === 'loading') ? 'not-allowed' : 'pointer',
                         opacity: !apiKey.trim() ? 0.5 : 1,
                       }}>
-                      {fetchStatus === 'loading' ? 'Fetching…' : fetchStatus === 'ok' ? '✓ Connected' : 'Fetch limits'}
+                      {fetchStatus === 'loading'
+                        ? (selectedIntegration.hasLimits ? 'Fetching…' : 'Connecting…')
+                        : fetchStatus === 'ok'
+                          ? '✓ Connected'
+                          : selectedIntegration.hasLimits ? 'Fetch limits' : 'Connect'}
                     </button>
                     <span style={{ fontSize: 11, color: '#333740' }}>
-                      Find in your provider's account → API Tokens
+                      {selectedIntegration.helpText}
                     </span>
                   </div>
                   {fetchStatus === 'err' && (
@@ -421,6 +474,25 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
                     <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <LimitTile label="Budget cap" main={`$${limits.computeHardLimitUSD.toLocaleString('en-US')}`} sub="hard limit" />
                       <LimitTile label="Alert at" main={`${limits.alertThresholdPct}% of cap`} sub={`$${limits.computeSoftLimitUSD.toLocaleString('en-US')}`} />
+                    </div>
+                  )}
+                  {fetchStatus === 'ok' && !limits && !selectedIntegration.hasLimits && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ fontSize: 10.5, color: '#3d4250', marginBottom: 8 }}>
+                        {selectedIntegration.label} doesn't expose a spend limit via API - enter your budget manually.
+                      </div>
+                      <div style={S.row2}>
+                        <div>
+                          <label style={S.label}>Budget cap ($) *</label>
+                          <input type="number" min={1} value={capAmount} onChange={(e) => setCapAmount(e.target.value)}
+                            placeholder="e.g. 1000" style={S.input} />
+                        </div>
+                        <div>
+                          <label style={S.label}>Alert at (%)</label>
+                          <input type="number" min={1} max={100} value={alertPct} onChange={(e) => setAlertPct(e.target.value)}
+                            style={S.input} />
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

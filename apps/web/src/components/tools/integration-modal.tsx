@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Loader2, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { api } from '@/lib/api';
+import { INTEGRATION_PROVIDERS } from '@/lib/integration-providers';
 
 interface Integration {
   id: string;
@@ -16,7 +17,7 @@ interface Integration {
   syncEveryMinutes: number;
 }
 
-interface RailwayLimits {
+interface ProviderLimits {
   computeHardLimitUSD: number;
   computeSoftLimitUSD: number;
   alertThresholdPct: number;
@@ -25,23 +26,36 @@ interface RailwayLimits {
 interface Props {
   toolId: string;
   toolName: string;
+  /** The tool's vendor - used to lock the integration to the matching provider so a Claude
+   * tool can't accidentally get connected to Railway (or vice versa) and silently sync the
+   * wrong provider's spend into this tool's numbers. */
+  toolVendor?: string;
   onClose: () => void;
   onSynced: () => void;
 }
 
-const PROVIDERS = [{ value: 'RAILWAY', label: 'Railway' }];
+const PROVIDERS = INTEGRATION_PROVIDERS;
 
-export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props) {
+export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSynced }: Props) {
+  // If the tool's vendor unambiguously matches one supported integration, there's nothing to
+  // choose - lock to it. Only fall back to a picker when the vendor doesn't match either
+  // (e.g. an older tool added before vendor auto-fill existed).
+  const vendorMatch = PROVIDERS.find((p) => p.vendor.toLowerCase() === toolVendor?.trim().toLowerCase());
+
   const [integration, setIntegration] = useState<Integration | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [formError, setFormError] = useState('');
-  const [provider, setProvider] = useState('RAILWAY');
+  const [provider, setProvider] = useState(vendorMatch?.value ?? PROVIDERS[0].value);
   const [apiToken, setApiToken] = useState('');
   const [showToken, setShowToken] = useState(false);
-  const [appliedLimits, setAppliedLimits] = useState<RailwayLimits | null>(null);
+  const [appliedLimits, setAppliedLimits] = useState<ProviderLimits | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const selectedProvider = PROVIDERS.find((p) => p.value === provider) ?? PROVIDERS[0];
+  // Once an integration exists, its provider is fixed too - never let the dropdown offer
+  // to silently re-point an already-connected tool at a different provider.
+  const providerLocked = !!integration || !!vendorMatch;
 
   async function fetchIntegration() {
     try {
@@ -60,26 +74,25 @@ export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props)
   }, [toolId]);
 
   async function handleSave() {
-    if (!apiToken.trim()) { setFormError('API token is required'); return; }
+    if (!apiToken.trim()) { setFormError(`${selectedProvider.tokenLabel} is required`); return; }
     setFormError(''); setSaving(true);
     try {
-      await api.put(`/integrations/${toolId}`, { provider, config: { apiToken: apiToken.trim() } });
+      await api.put(`/integrations/${toolId}`, { provider, config: { [selectedProvider.tokenKey]: apiToken.trim() } });
       setApiToken('');
 
-      // Fetch usage limits from the provider and auto-apply to the tool
-      if (provider === 'RAILWAY') {
-        try {
-          const limits = await api.get<RailwayLimits | null>(`/integrations/${toolId}/limits`);
-          if (limits) {
-            await api.patch(`/tools/${toolId}`, {
-              capAmount: limits.computeHardLimitUSD,
-              alertThresholdPct: limits.alertThresholdPct,
-            });
-            setAppliedLimits(limits);
-          }
-        } catch {
-          // Limits fetch is best-effort - don't fail the whole connect flow
+      // Fetch usage limits from the provider and auto-apply to the tool - a no-op
+      // (null) for providers that don't expose one, so no per-provider gate needed here.
+      try {
+        const limits = await api.get<ProviderLimits | null>(`/integrations/${toolId}/limits`);
+        if (limits) {
+          await api.patch(`/tools/${toolId}`, {
+            capAmount: limits.computeHardLimitUSD,
+            alertThresholdPct: limits.alertThresholdPct,
+          });
+          setAppliedLimits(limits);
         }
+      } catch {
+        // Limits fetch is best-effort - don't fail the whole connect flow
       }
 
       await fetchIntegration();
@@ -127,6 +140,18 @@ export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props)
     }
     if (/rate limit/i.test(raw)) {
       return "Railway is rate-limiting our requests - this will resolve itself on the next sync.";
+    }
+    if (/claude config missing adminapikey/i.test(raw)) {
+      return "No Admin API key saved yet - enter one below and connect.";
+    }
+    if (/anthropic cost report (query|history) failed|cost report request failed/i.test(raw)) {
+      return "Couldn't reach Anthropic's Cost Report API - this will resolve itself on the next sync, or check that your Admin API key is still valid.";
+    }
+    if (/^(401|invalid x-api-key|authentication_error)/i.test(raw) || /invalid api key/i.test(raw)) {
+      return "This key was rejected by Anthropic. Make sure it's an Admin API key (starts with sk-ant-admin01-), not a regular API key.";
+    }
+    if (/permission_error|does not have permission/i.test(raw)) {
+      return "This Admin API key doesn't have permission to read cost data for this organization.";
     }
     return raw;
   }
@@ -210,14 +235,14 @@ export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props)
               <div style={{ borderRadius: 12, padding: '12px 14px', background: 'rgba(94,106,210,.08)', border: '1px solid rgba(94,106,210,.28)', marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
                   <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#9aa2ef" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L6 9l-3-3" /></svg>
-                  <span style={{ fontSize: 12, fontWeight: 650, color: '#9aa2ef' }}>Budget synced from Railway</span>
+                  <span style={{ fontSize: 12, fontWeight: 650, color: '#9aa2ef' }}>Budget synced from {selectedProvider.label}</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px' }}>
                   <LimitRow label="Budget cap" usd={appliedLimits.computeHardLimitUSD} />
                   <LimitRow label="Alert threshold" usd={appliedLimits.computeSoftLimitUSD} pct={appliedLimits.alertThresholdPct} />
                 </div>
                 <div style={{ marginTop: 8, fontSize: 10.5, color: '#5e6480' }}>
-                  Based on your Railway compute hard limit
+                  Based on your {selectedProvider.label} usage limit
                 </div>
               </div>
             )}
@@ -232,19 +257,25 @@ export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props)
             {/* Provider */}
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 11.5, color: '#9aa0ab', marginBottom: 6 }}>Provider</label>
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value)}
-                style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 13 }}
-              >
-                {PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </select>
+              {providerLocked ? (
+                <div style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 13, boxSizing: 'border-box', color: '#8a909b' }}>
+                  {selectedProvider.label}
+                </div>
+              ) : (
+                <select
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value)}
+                  style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 13 }}
+                >
+                  {PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              )}
             </div>
 
             {/* API Token */}
             <div style={{ marginBottom: 20 }}>
               <label style={{ display: 'block', fontSize: 11.5, color: '#9aa0ab', marginBottom: 6 }}>
-                API Token
+                {selectedProvider.tokenLabel}
                 {isConnected && <span style={{ color: '#4a4f59', marginLeft: 6 }}>(re-enter to update)</span>}
               </label>
               <div style={{ position: 'relative' }}>
@@ -253,7 +284,7 @@ export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props)
                   value={apiToken}
                   onChange={(e) => setApiToken(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }}
-                  placeholder={isConnected ? 'Enter new token to update' : 'Paste your Railway API token'}
+                  placeholder={isConnected ? `Enter new ${selectedProvider.tokenLabel.toLowerCase()} to update` : selectedProvider.placeholder}
                   style={{ ...S, width: '100%', padding: '9px 40px 9px 12px', borderRadius: 10, fontSize: 13, boxSizing: 'border-box' }}
                 />
                 <button
@@ -264,11 +295,9 @@ export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props)
                   {showToken ? <EyeOffIcon /> : <EyeIcon />}
                 </button>
               </div>
-              {provider === 'RAILWAY' && (
-                <p style={{ fontSize: 11, color: '#4a4f59', marginTop: 6 }}>
-                  railway.com → Account Settings → API Tokens
-                </p>
-              )}
+              <p style={{ fontSize: 11, color: '#4a4f59', marginTop: 6 }}>
+                {selectedProvider.helpText}
+              </p>
             </div>
 
             {/* Actions */}

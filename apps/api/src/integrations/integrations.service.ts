@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { IntegrationRunnerService } from './integration-runner.service';
-import { RailwayProvider } from './providers/railway.provider';
+import { IntegrationRunnerService, PROVIDERS } from './integration-runner.service';
 
 @Injectable()
 export class IntegrationsService {
@@ -50,11 +49,11 @@ export class IntegrationsService {
     const integration = await this.prisma.toolIntegration.findUnique({ where: { toolId } });
     if (!integration) throw new NotFoundException('No integration configured for this tool');
 
-    if (integration.provider !== 'RAILWAY') {
-      return null; // only Railway exposes usage limits via API
+    const provider = PROVIDERS[integration.provider];
+    if (!provider?.fetchLimitsUSD) {
+      return null; // this provider doesn't expose usage limits via API
     }
 
-    const provider = new RailwayProvider();
     const limits = await provider.fetchLimitsUSD(integration.config as Record<string, any>);
     if (!limits) return null;
 
@@ -67,11 +66,11 @@ export class IntegrationsService {
     };
   }
 
-  async previewLimits(provider: string, config: Record<string, any>) {
-    if (provider !== 'RAILWAY') return null;
+  async previewLimits(providerName: string, config: Record<string, any>) {
+    const provider = PROVIDERS[providerName];
+    if (!provider?.fetchLimitsUSD) return null;
 
-    const railwayProvider = new RailwayProvider();
-    const limits = await railwayProvider.fetchLimitsUSD(config);
+    const limits = await provider.fetchLimitsUSD(config);
     if (!limits) return null;
 
     return {
@@ -88,11 +87,11 @@ export class IntegrationsService {
     const integration = await this.prisma.toolIntegration.findUnique({ where: { toolId } });
     if (!integration) throw new NotFoundException('No integration configured for this tool');
 
-    if (integration.provider !== 'RAILWAY') {
+    const provider = PROVIDERS[integration.provider];
+    if (!provider?.fetchHistoricalSpendUSD) {
       throw new NotFoundException('Usage history is not available for this provider yet');
     }
 
-    const provider = new RailwayProvider();
     const { amountUSD, breakdown, byProject } = await provider.fetchHistoricalSpendUSD(
       integration.config as Record<string, any>,
       { startDate, endDate },

@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
-import { IntegrationRunnerService } from '../integrations/integration-runner.service';
+import { IntegrationRunnerService, PROVIDERS } from '../integrations/integration-runner.service';
+import { BillingService } from '../billing/billing.service';
 
 @Injectable()
 export class SchedulerService {
@@ -15,6 +16,7 @@ export class SchedulerService {
     private prisma: PrismaService,
     private mail: MailService,
     private integrationRunner: IntegrationRunnerService,
+    private billing: BillingService,
   ) { }
 
   // ── Integration data sync - every 15 minutes ─────────────────────
@@ -96,5 +98,119 @@ export class SchedulerService {
         this.logger.error(`Renewal reminder failed for ${tool.name}: ${err.message}`);
       }
     }
+  }
+
+  // ── Roll forward past renewal dates - daily at 9:10 AM, right after the ──
+  // reminder check above so a "renews today" (daysAway = 0) email still goes
+  // out with the correct date before this advances it to the next cycle.
+  // Only MOSUB/CAPSUB are recurring monthly billing cycles - PREPAID's
+  // renewalDate is a contract/license term (e.g. annual), not a monthly one,
+  // so it's left alone here.
+  @Cron('10 9 * * *')
+  async rollForwardRenewalDates() {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const tools = await this.prisma.tool.findMany({
+      where: {
+        deletedAt: null,
+        paymentKind: { in: ['MOSUB', 'CAPSUB'] },
+        renewalDate: { lt: startOfToday },
+      },
+    });
+
+    for (const tool of tools) {
+      if (!tool.renewalDate) continue;
+
+      const { completedCycles, next } = this.advanceMonthlyUntilAfter(new Date(tool.renewalDate), startOfToday);
+
+      // Each renewal date we stepped past is a billing cycle that completed (the
+      // subscription auto-renewed) - log it so it shows up in Reports > Billing
+      // History without anyone having to enter it by hand. Idempotent: re-running
+      // for a cycle already recorded is a no-op (see recordCompletedCycle).
+      for (const billedAt of completedCycles) {
+        const monthKey = `${billedAt.getFullYear()}-${String(billedAt.getMonth() + 1).padStart(2, '0')}`;
+        try {
+          await this.billing.recordCompletedCycle(tool.orgId, tool.id, monthKey, tool.monthlyAmount, billedAt);
+        } catch (err: any) {
+          this.logger.error(`Failed to auto-log billing cycle for ${tool.name} (${monthKey}): ${err.message}`);
+        }
+      }
+
+      await this.prisma.tool.update({
+        where: { id: tool.id },
+        data: { renewalDate: next },
+      });
+      this.logger.log(
+        `Rolled forward renewal date for ${tool.name}: ${new Date(tool.renewalDate).toDateString()} → ${next.toDateString()}`,
+      );
+    }
+  }
+
+  // ── Log completed-month billing for usage-based integrated tools - ───────
+  // once a month, just after midnight on the 1st. Subscriptions get a billing
+  // record from the renewal-date rollover above (keyed to their own billing
+  // anniversary); PREPAID tools have no such date - their spend is metered
+  // continuously by the provider - so this closes the calendar month instead,
+  // pulling the authoritative final total via the same fetchHistoricalSpendUSD
+  // path Usage History's "Last Month" view uses (never the possibly-stale
+  // `usedAmount` snapshot, which reflects "so far this new month" by the time
+  // this runs). Together with the rollover cron, every tool with a connected
+  // integration or a subscription now gets a Billing History entry automatically.
+  @Cron('20 0 1 * *')
+  async recordCompletedMonthUsageBilling() {
+    const now = new Date();
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfPrevMonth = new Date(startOfThisMonth.getTime() - 1);
+    const monthKey = `${startOfPrevMonth.getFullYear()}-${String(startOfPrevMonth.getMonth() + 1).padStart(2, '0')}`;
+
+    const tools = await this.prisma.tool.findMany({
+      where: { deletedAt: null, paymentKind: 'PREPAID' },
+      include: { integration: true },
+    });
+
+    for (const tool of tools) {
+      const integration = tool.integration;
+      if (!integration?.isActive) continue;
+
+      const provider = PROVIDERS[integration.provider];
+      if (!provider?.fetchHistoricalSpendUSD) continue;
+
+      try {
+        const { amountUSD } = await provider.fetchHistoricalSpendUSD(
+          integration.config as Record<string, any>,
+          { startDate: startOfPrevMonth, endDate: startOfThisMonth },
+        );
+        await this.billing.recordCompletedCycle(tool.orgId, tool.id, monthKey, amountUSD, endOfPrevMonth);
+        this.logger.log(`Logged completed-month billing for ${tool.name} (${monthKey}): $${amountUSD.toFixed(2)}`);
+      } catch (err: any) {
+        this.logger.error(`Failed to log completed-month billing for ${tool.name} (${monthKey}): ${err.message}`);
+      }
+    }
+  }
+
+  /**
+   * Adds whole months to `date` until it's on/after `untilAfter`, clamping the day
+   * to the last valid day of the target month (e.g. Jan 31 → Feb 28, not Mar 3).
+   * Returns every intermediate date stepped past (each one a completed billing cycle)
+   * alongside the final resulting date. Capped at 60 iterations (5 years) so a data
+   * anomaly can't loop forever.
+   */
+  private advanceMonthlyUntilAfter(date: Date, untilAfter: Date): { completedCycles: Date[]; next: Date } {
+    const day = date.getDate();
+    const completedCycles: Date[] = [];
+    let result = date;
+    let iterations = 0;
+
+    while (result < untilAfter && iterations < 60) {
+      completedCycles.push(result);
+      const targetMonthIndex = result.getMonth() + 1;
+      const daysInTargetMonth = new Date(result.getFullYear(), targetMonthIndex + 1, 0).getDate();
+      result = new Date(result.getFullYear(), targetMonthIndex, Math.min(day, daysInTargetMonth));
+      iterations++;
+    }
+
+    return { completedCycles, next: result };
   }
 }

@@ -3,10 +3,12 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { IntegrationProvider } from './provider.interface';
 import { RailwayProvider } from './providers/railway.provider';
+import { ClaudeProvider } from './providers/claude.provider';
 
 // Register new providers here - no other file needs to change.
-const PROVIDERS: Record<string, IntegrationProvider> = {
+export const PROVIDERS: Record<string, IntegrationProvider> = {
   RAILWAY: new RailwayProvider(),
+  CLAUDE: new ClaudeProvider(),
 };
 
 @Injectable()

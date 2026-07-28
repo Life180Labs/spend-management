@@ -50,6 +50,36 @@ export class BillingService {
     return record;
   }
 
+  /**
+   * Auto-logs a completed billing period as PAID - called by the scheduler either when a
+   * subscription's renewal date rolls over, or when a usage-based integrated tool's
+   * calendar month closes (see SchedulerService.rollForwardRenewalDates and
+   * .recordCompletedMonthUsageBilling). Idempotent: the (orgId, toolId, monthKey) unique
+   * constraint means a re-run for the same period is silently ignored, not double-billed.
+   */
+  async recordCompletedCycle(orgId: string, toolId: string, monthKey: string, amount: number, billedAt: Date) {
+    const tool = await this.prisma.tool.findFirst({ where: { id: toolId, orgId } });
+    if (!tool) return null;
+
+    try {
+      return await this.prisma.billingRecord.create({
+        data: {
+          orgId,
+          toolId,
+          toolSnapshotJson: { name: tool.name, vendor: tool.vendor, category: tool.category },
+          monthKey,
+          monthLabel: this.formatMonthLabel(monthKey),
+          amount,
+          status: 'PAID',
+          paidAt: billedAt,
+        },
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2002') return null; // already recorded for this tool+month
+      throw err;
+    }
+  }
+
   async markPaid(id: string, orgId: string, actorId: string) {
     const record = await this.prisma.billingRecord.findFirst({ where: { id, orgId } });
     if (!record) throw new NotFoundException('Billing record not found');

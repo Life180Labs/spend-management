@@ -24,6 +24,7 @@ interface Tool {
   barPct: number; alertThresholdPct: number; alert: boolean;
   statusSub: string; triggerEmail: string | null;
   renewalDate: string | null; daysUntilRenewal: number | null;
+  isActive: boolean;
   integration: { provider: string; lastSyncAt: string | null; lastSyncAmountUSD: number | null; isActive: boolean; lastError: string | null } | null;
 }
 
@@ -164,7 +165,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2">
           {/* Currency toggle */}
           <div style={{ display: 'flex', borderRadius: 8, border: '1px solid #1E212A', overflow: 'hidden' }}>
-            {(['INR', 'USD'] as const).map((c) => (
+            {(['USD', 'INR'] as const).map((c) => (
               <button key={c} onClick={() => setCurrency(c)} style={{ padding: '6px 13px', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: currency === c ? '#5E6AD2' : 'transparent', color: currency === c ? '#fff' : '#6b707b', transition: 'all .15s' }}>
                 {c === 'INR' ? '₹ INR' : '$ USD'}
               </button>
@@ -333,7 +334,11 @@ export default function DashboardPage() {
 
       {/* Modals */}
       {showAdd && (
-        <AddToolModal onClose={() => setShowAdd(false)} onCreated={(t) => { showToast(`${t.name} added`); setShowAdd(false); load(); }} />
+        <AddToolModal
+          connectedProviders={new Set(tools.filter((t) => t.integration?.isActive).map((t) => t.integration!.provider))}
+          onClose={() => setShowAdd(false)}
+          onCreated={(t) => { showToast(`${t.name} added`); setShowAdd(false); load(); }}
+        />
       )}
       {editTool && (
         <AddToolModal tool={editTool} onClose={() => setEditTool(null)} onCreated={(updated) => { showToast(`${updated.name} updated`); setEditTool(null); load(); }} />
@@ -342,6 +347,7 @@ export default function DashboardPage() {
         <IntegrationModal
           toolId={integrationTool.id}
           toolName={integrationTool.name}
+          toolVendor={integrationTool.vendor}
           onClose={() => setIntegrationTool(null)}
           onSynced={() => { load(); showToast('Spend data updated'); }}
         />
@@ -411,7 +417,7 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, renewMain, renewS
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 11, color: '#6b707b' }}>{tool.vendor}</span>
-            {hasIntegration && (
+            {hasIntegration ? (
               <button
                 onClick={(e: React.MouseEvent) => { e.stopPropagation(); onIntegration(); }}
                 title={syncError ? `Sync error: ${syncError}` : 'Integration active - click to configure'}
@@ -420,6 +426,18 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, renewMain, renewS
                 <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'currentColor', flexShrink: 0, display: 'inline-block' }} />
                 {syncError ? 'Sync error' : 'Live'}
               </button>
+            ) : tool.isActive && (
+              // No API sync exists for this tool (e.g. a manual subscription like Claude
+              // Pro) - "Active" signals the team is using it, without implying a live
+              // data feed the way "Live" does. Keep the two labels distinct so "Live"
+              // never stops meaning "actually syncing via an integration."
+              <span
+                title="Marked as an actively used tool"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 20, background: 'rgba(94,106,210,.14)', border: '1px solid rgba(94,106,210,.32)', color: '#9aa2ef', fontSize: 9.5, fontWeight: 600, letterSpacing: '.03em' }}
+              >
+                <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'currentColor', flexShrink: 0, display: 'inline-block' }} />
+                Active
+              </span>
             )}
           </div>
         </div>

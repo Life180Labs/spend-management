@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Clock } from 'lucide-react';
 import { api } from '@/lib/api';
 import { fmt } from '@/lib/utils';
 import { exportSpendAnalysis, exportBillingHistory } from '@/lib/excel';
@@ -10,19 +11,36 @@ interface BillingRecord {
   id: string; monthKey: string; monthLabel: string; amount: number; status: string;
   tool: { name: string; monoInitials: string; monoBgColor: string; category: string } | null;
 }
-interface MonthSummary { monthKey: string; monthLabel: string; total: number; count: number; }
+
+type Period = 'current' | 'last' | 'custom';
+
+function monthKeyNMonthsAgo(n: number): string {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() - n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
 
 const CAT_LABELS: Record<string, string> = {
   AI_LLM: 'AI / LLM', CLOUD_INFRA: 'Cloud Infra', COMMUNICATION: 'Communication',
   DEV_TOOLS: 'Dev Tools', DESIGN: 'Design', HOSTING: 'Hosting', MONITORING: 'Monitoring', OTHER: 'Other',
 };
 
+const fieldStyle: React.CSSProperties = {
+  width: '100%', boxSizing: 'border-box', padding: '9px 12px', fontSize: 13, color: '#E8EAF0',
+  backgroundColor: '#1A1D26', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 9, outline: 'none',
+};
+const labelStyle: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#767b86',
+  marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em',
+};
+
 export default function ReportsPage() {
   const [tab, setTab] = useState<'spend' | 'billing'>('spend');
   const [categories, setCategories] = useState<CategoryData[]>([]);
   const [billing, setBilling] = useState<BillingRecord[]>([]);
-  const [monthSummary, setMonthSummary] = useState<MonthSummary[]>([]);
-  const [monthFilter, setMonthFilter] = useState<string>('all');
+  const [period, setPeriod] = useState<Period>('current');
+  const [customFrom, setCustomFrom] = useState(monthKeyNMonthsAgo(2));
+  const [customTo, setCustomTo] = useState(monthKeyNMonthsAgo(0));
   const [currency, setCurrency] = useState<'INR' | 'USD'>('USD');
   const [fxRate, setFxRate] = useState(94.4);
 
@@ -41,12 +59,17 @@ export default function ReportsPage() {
   useEffect(() => {
     api.get<CategoryData[]>('/reports/spend-by-category').then(setCategories);
     api.get<{ items: BillingRecord[] }>('/reports/billing-history?limit=100').then((d) => setBilling(d.items));
-    api.get<MonthSummary[]>('/billing/month-summary').then(setMonthSummary);
   }, []);
 
   const totalSpend = categories.reduce((s, c) => s + c.total, 0);
   const toolCount = billing.reduce((acc, r) => { acc.add(r.tool?.name || '?'); return acc; }, new Set<string>()).size;
-  const filteredBilling = monthFilter === 'all' ? billing : billing.filter((r) => r.monthKey === monthFilter);
+
+  const periodLabel = period === 'current' ? monthKeyNMonthsAgo(0)
+    : period === 'last' ? monthKeyNMonthsAgo(1)
+    : `${customFrom}_to_${customTo}`;
+  const filteredBilling = period === 'current' ? billing.filter((r) => r.monthKey === monthKeyNMonthsAgo(0))
+    : period === 'last' ? billing.filter((r) => r.monthKey === monthKeyNMonthsAgo(1))
+    : billing.filter((r) => r.monthKey >= customFrom && r.monthKey <= customTo); // YYYY-MM sorts lexicographically
   const filteredTotal = filteredBilling.reduce((s, r) => s + r.amount, 0);
 
   const fmtAmt = (n: number) => currency === 'USD'
@@ -72,7 +95,7 @@ export default function ReportsPage() {
             if (tab === 'spend') {
               exportSpendAnalysis(categories, reportStats, currency, fxRate);
             } else {
-              exportBillingHistory(filteredBilling, monthFilter, currency, fxRate);
+              exportBillingHistory(filteredBilling, periodLabel, currency, fxRate);
             }
           }}
           label={tab === 'spend' ? 'Download Spend Report' : 'Download Billing History'}
@@ -122,12 +145,59 @@ export default function ReportsPage() {
 
       {tab === 'billing' && (
         <>
-          {/* Month filter pills */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <MonthBtn active={monthFilter === 'all'} onClick={() => setMonthFilter('all')}>All months</MonthBtn>
-            {monthSummary.map((m) => (
-              <MonthBtn key={m.monthKey} active={monthFilter === m.monthKey} onClick={() => setMonthFilter(m.monthKey)}>{m.monthLabel}</MonthBtn>
-            ))}
+          {/* Period selector */}
+          <div style={{ background: '#0E1014', border: '1px solid #1A1D24', borderRadius: 14, padding: 18 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: period === 'custom' ? '2fr 1fr 1fr' : '1fr', gap: 14, alignItems: 'end' }}>
+              <div>
+                <label style={labelStyle}><Clock size={11} /> Period</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, maxWidth: 420 }}>
+                  {([
+                    { key: 'current', label: 'Current Month' },
+                    { key: 'last', label: 'Last Month' },
+                    { key: 'custom', label: 'Custom' },
+                  ] as const).map((p) => {
+                    const on = period === p.key;
+                    return (
+                      <button
+                        key={p.key}
+                        type="button"
+                        onClick={() => setPeriod(p.key)}
+                        style={{
+                          padding: '9px 8px', fontSize: 12, fontWeight: 600, textAlign: 'center',
+                          backgroundColor: on ? 'rgba(94,106,210,0.16)' : '#161921',
+                          border: on ? '1.5px solid rgba(94,106,210,0.55)' : '1.5px solid rgba(255,255,255,0.07)',
+                          color: on ? '#9aa2ef' : '#7a8090',
+                          borderRadius: 9, cursor: 'pointer', transition: 'background .15s, border-color .15s',
+                        }}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {period === 'custom' && (
+                <>
+                  <div>
+                    <label style={labelStyle}>From</label>
+                    <input
+                      type="month" value={customFrom} max={customTo}
+                      onChange={(e) => setCustomFrom(e.target.value)}
+                      style={{ ...fieldStyle, colorScheme: 'dark' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>To</label>
+                    <input
+                      type="month" value={customTo} min={customFrom} max={monthKeyNMonthsAgo(0)}
+                      onChange={(e) => setCustomTo(e.target.value)}
+                      style={{ ...fieldStyle, colorScheme: 'dark' }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Billing table */}
@@ -148,9 +218,17 @@ export default function ReportsPage() {
                 <div style={{ fontSize: 12, color: '#9aa0ab' }}>{r.monthLabel}</div>
                 <div style={{ fontSize: 13.5, fontWeight: 650, color: '#F2F3F5', fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(r.amount)}</div>
                 <div>
-                  <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: r.status === 'PAID' ? 'rgba(63,185,80,.12)' : 'rgba(245,166,35,.12)', color: r.status === 'PAID' ? '#3FB950' : '#d99e3e' }}>
-                    {r.status === 'PAID' ? 'Paid' : 'Pending'}
-                  </span>
+                  {(() => {
+                    const isLive = r.id.startsWith('live-');
+                    const label = r.status === 'PAID' ? 'Paid' : isLive ? 'In progress' : 'Pending';
+                    const color = r.status === 'PAID' ? '#3FB950' : isLive ? '#9aa2ef' : '#d99e3e';
+                    const bg = r.status === 'PAID' ? 'rgba(63,185,80,.12)' : isLive ? 'rgba(94,106,210,.14)' : 'rgba(245,166,35,.12)';
+                    return (
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: bg, color }}>
+                        {label}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
@@ -189,14 +267,6 @@ function DownloadBtn({ onClick, label }: { onClick: () => void; label: string })
 function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button onClick={onClick} style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 550, padding: '7px 16px', borderRadius: 7, cursor: 'pointer', border: `1px solid ${active ? '#2a2e3d' : 'transparent'}`, background: active ? '#1B1E26' : 'transparent', color: active ? '#E6E8EC' : '#6b707b' }}>
-      {children}
-    </button>
-  );
-}
-
-function MonthBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} style={{ fontFamily: 'inherit', fontSize: 12, fontWeight: 550, padding: '5px 13px', borderRadius: 20, cursor: 'pointer', border: `1px solid ${active ? 'rgba(94,106,210,.4)' : '#1E212A'}`, background: active ? 'rgba(94,106,210,.12)' : 'transparent', color: active ? '#9aa2ef' : '#6b707b' }}>
       {children}
     </button>
   );
