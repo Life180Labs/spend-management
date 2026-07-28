@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback, type ReactNode } from 'react';
-import { Plus, RefreshCw, Download } from 'lucide-react';
+import { Plus, Download } from 'lucide-react';
 import { api } from '@/lib/api';
 import { fmtDate } from '@/lib/utils';
 import { exportToolsList } from '@/lib/excel';
 import { AddToolModal } from '@/components/tools/add-tool-modal';
 import { IntegrationModal } from '@/components/tools/integration-modal';
+import { INTEGRATION_PROVIDERS } from '@/lib/integration-providers';
 
 interface KPIs {
   totalMonthlySpend: number;
@@ -178,9 +179,6 @@ export default function DashboardPage() {
           >
             <Download size={13} />
           </button>
-          <button onClick={load} style={{ width: 34, height: 34, borderRadius: 9, background: 'transparent', border: '1px solid #1E212A', color: '#6b707b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            <RefreshCw size={13} />
-          </button>
           <button onClick={() => setShowAdd(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 9, background: '#5E6AD2', border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
             <Plus size={14} /> Add Tool
           </button>
@@ -335,7 +333,20 @@ export default function DashboardPage() {
       {/* Modals */}
       {showAdd && (
         <AddToolModal
-          connectedProviders={new Set(tools.filter((t) => t.integration?.isActive).map((t) => t.integration!.provider))}
+          // Block re-adding a provider once ANY tool for it already exists - not just
+          // ones with a live integration. A manually-tracked tool (e.g. a Claude Pro
+          // subscription with no API key) still means "we already have a Claude entry,"
+          // so offering it again in the dropdown would just create a confusing duplicate.
+          connectedProviders={new Set(
+            tools
+              .map((t) => INTEGRATION_PROVIDERS.find((p) => {
+                const vendor = p.vendor.toLowerCase();
+                const toolVendor = t.vendor.trim().toLowerCase();
+                return toolVendor === vendor || toolVendor.includes(vendor);
+              }))
+              .filter((p): p is typeof INTEGRATION_PROVIDERS[number] => !!p)
+              .map((p) => p.value),
+          )}
           onClose={() => setShowAdd(false)}
           onCreated={(t) => { showToast(`${t.name} added`); setShowAdd(false); load(); }}
         />
