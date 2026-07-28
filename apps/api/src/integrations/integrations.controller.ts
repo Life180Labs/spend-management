@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Delete, Post, Param, Body, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Put, Delete, Post, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { IntegrationsService } from './integrations.service';
 
@@ -36,5 +36,23 @@ export class IntegrationsController {
   @Post(':toolId/sync')
   syncNow(@Param('toolId') toolId: string, @Req() req: any) {
     return this.integrations.syncNow(toolId, req.user.orgId);
+  }
+
+  @Get(':toolId/history')
+  getUsageHistory(
+    @Param('toolId') toolId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Req() req: any,
+  ) {
+    const startDate = new Date(from);
+    const endDate = new Date(to);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new BadRequestException('from/to must be valid ISO dates');
+    }
+    if (startDate > endDate) {
+      throw new BadRequestException('from must be before to');
+    }
+    return this.integrations.getUsageHistory(toolId, req.user.orgId, startDate, endDate);
   }
 }

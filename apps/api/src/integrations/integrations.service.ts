@@ -8,13 +8,13 @@ export class IntegrationsService {
   constructor(
     private prisma: PrismaService,
     private runner: IntegrationRunnerService,
-  ) {}
+  ) { }
 
   async get(toolId: string, orgId: string) {
     await this.assertToolOwnership(toolId, orgId);
     const integration = await this.prisma.toolIntegration.findUnique({ where: { toolId } });
     if (!integration) return null;
-    // Return config with apiToken masked — never expose raw secrets over the API
+    // Return config with apiToken masked - never expose raw secrets over the API
     const { config, ...rest } = integration;
     const safeConfig = this.maskConfig(config as Record<string, any>);
     return { ...rest, config: safeConfig };
@@ -81,6 +81,24 @@ export class IntegrationsService {
         ? Math.round((limits.computeSoftLimitUSD / limits.computeHardLimitUSD) * 100)
         : 80,
     };
+  }
+
+  async getUsageHistory(toolId: string, orgId: string, startDate: Date, endDate: Date) {
+    await this.assertToolOwnership(toolId, orgId);
+    const integration = await this.prisma.toolIntegration.findUnique({ where: { toolId } });
+    if (!integration) throw new NotFoundException('No integration configured for this tool');
+
+    if (integration.provider !== 'RAILWAY') {
+      throw new NotFoundException('Usage history is not available for this provider yet');
+    }
+
+    const provider = new RailwayProvider();
+    const { amountUSD, breakdown, byProject } = await provider.fetchHistoricalSpendUSD(
+      integration.config as Record<string, any>,
+      { startDate, endDate },
+    );
+
+    return { amountUSD, breakdown, byProject, startDate, endDate };
   }
 
   async syncNow(toolId: string, orgId: string) {

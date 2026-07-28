@@ -20,7 +20,7 @@ interface KPIs {
 interface Tool {
   id: string; name: string; vendor: string; category: string;
   paymentKind: string; monoInitials: string; monoBgColor: string;
-  usedAmount: number; capAmount: number; monthlyAmount: number; // USD — the app's base currency
+  usedAmount: number; capAmount: number; monthlyAmount: number; // USD - the app's base currency
   barPct: number; alertThresholdPct: number; alert: boolean;
   statusSub: string; triggerEmail: string | null;
   renewalDate: string | null; daysUntilRenewal: number | null;
@@ -43,7 +43,7 @@ const GRID = 'minmax(200px,2.1fr) 1.15fr 1fr 1.95fr 1.7fr 1.15fr 60px';
 const HEADERS = ['Tool', 'Category', 'Payment', 'Budget Status', 'Alert / Renewal Trigger', 'Next Renewal', 'Actions'];
 
 function makeFmt(currency: 'INR' | 'USD', fxRate: number) {
-  // Every stored amount is USD-native — the app's base currency. USD display
+  // Every stored amount is USD-native - the app's base currency. USD display
   // needs no conversion; INR is derived on the fly from the live FX rate.
   return (usdAmount: number) => {
     if (currency === 'USD') {
@@ -62,7 +62,7 @@ function computeRow(t: Tool, fmtAmt: (n: number) => string) {
   const statusSubColor = t.alert ? '#F85149' : t.barPct >= 75 ? '#F5A623' : t.paymentKind === 'PREPAID' && t.barPct < 70 ? '#3FB950' : '#9aa0ab';
   const barColor = t.alert ? 'linear-gradient(90deg,#C9352B,#F85149)' : t.barPct >= 75 ? 'linear-gradient(90deg,#D9881F,#F5A623)' : t.paymentKind === 'PREPAID' ? 'linear-gradient(90deg,#2EA043,#3FB950)' : 'linear-gradient(90deg,#4F5BD5,#6470e0)';
 
-  let renewMain = '—'; let renewSub = ''; let renewColor = '#9aa0ab'; let renewUrgent = false;
+  let renewMain = '-'; let renewSub = ''; let renewColor = '#9aa0ab'; let renewUrgent = false;
 
   if (t.renewalDate) {
     renewMain = fmtDate(t.renewalDate);
@@ -107,7 +107,7 @@ export default function DashboardPage() {
     fetch('https://api.frankfurter.app/latest?from=USD&to=INR')
       .then((r) => r.json())
       .then((d: any) => { if (d?.rates?.INR) setFxRate(d.rates.INR); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -147,8 +147,8 @@ export default function DashboardPage() {
 
   const displayed = filter === 'All' ? tools
     : filter === 'NOBUDGET' ? tools.filter((t) => t.paymentKind === 'NOBUDGET')
-    : filter === 'PREPAID' ? tools.filter((t) => t.paymentKind === 'PREPAID')
-    : tools.filter((t) => ['MOSUB', 'CAPSUB'].includes(t.paymentKind));
+      : filter === 'PREPAID' ? tools.filter((t) => t.paymentKind === 'PREPAID')
+        : tools.filter((t) => ['MOSUB', 'CAPSUB'].includes(t.paymentKind));
 
   const noBudgetNames = tools.filter((t) => t.paymentKind === 'NOBUDGET').map((t) => t.name).join(' & ') || 'None';
   const nearestRenewalText = (kpis?.renewalCount ?? 0) === 0 ? 'No upcoming renewals' : 'within the next 5 days';
@@ -205,11 +205,11 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <span style={{ fontSize: 12, color: '#d6a44e', fontWeight: 500 }}>Tools Needing Budget Setup</span>
               <span style={{ color: '#F5A623', display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(245,166,35,.14)' }}>
-                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.2L14.5 13H1.5L8 2.2Z"/><line x1="8" y1="6.5" x2="8" y2="9.3"/><circle cx="8" cy="11.1" r=".35" fill="currentColor"/></svg>
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.2L14.5 13H1.5L8 2.2Z" /><line x1="8" y1="6.5" x2="8" y2="9.3" /><circle cx="8" cy="11.1" r=".35" fill="currentColor" /></svg>
               </span>
             </div>
             <div style={{ fontSize: 28, fontWeight: 680, color: '#F5A623', letterSpacing: '-.02em', lineHeight: 1 }}>{kpis.noBudgetCount}</div>
-            <div style={{ fontSize: 12, color: '#8a7d5e', marginTop: 11 }}>{kpis.noBudgetCount > 0 ? `${noBudgetNames} — uncapped` : 'All tools are configured'}</div>
+            <div style={{ fontSize: 12, color: '#8a7d5e', marginTop: 11 }}>{kpis.noBudgetCount > 0 ? `${noBudgetNames} - uncapped` : 'All tools are configured'}</div>
           </div>
 
           {/* Card 3: Active Threshold Alerts */}
@@ -217,7 +217,7 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <span style={{ fontSize: 12, color: '#878c96', fontWeight: 500 }}>Active Threshold Alerts</span>
               <span style={{ color: '#F85149', display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(248,81,73,.12)', animation: 'pulseRing 2.4s ease-in-out infinite' }}>
-                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 2.5c-2 0-3.2 1.4-3.2 3.3 0 2.5-1 3.5-1.4 3.9-.1.2.1.4.4.4h8.4c.3 0 .5-.2.4-.4-.4-.4-1.4-1.4-1.4-3.9C11.2 3.9 10 2.5 8 2.5Z" strokeLinejoin="round"/><path d="M6.7 12.2a1.4 1.4 0 0 0 2.6 0" strokeLinecap="round"/></svg>
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 2.5c-2 0-3.2 1.4-3.2 3.3 0 2.5-1 3.5-1.4 3.9-.1.2.1.4.4.4h8.4c.3 0 .5-.2.4-.4-.4-.4-1.4-1.4-1.4-3.9C11.2 3.9 10 2.5 8 2.5Z" strokeLinejoin="round" /><path d="M6.7 12.2a1.4 1.4 0 0 0 2.6 0" strokeLinecap="round" /></svg>
               </span>
             </div>
             <div style={{ fontSize: 28, fontWeight: 680, color: '#F2F3F5', letterSpacing: '-.02em', lineHeight: 1 }}>{kpis.alertCount}</div>
@@ -233,7 +233,7 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <span style={{ fontSize: 12, color: '#878c96', fontWeight: 500 }}>Upcoming Renewals</span>
               <span style={{ color: '#5E6AD2', display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(94,106,210,.12)' }}>
-                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2.5" y="3" width="11" height="11" rx="2"/><line x1="2.5" y1="6.2" x2="13.5" y2="6.2"/><line x1="5.5" y1="1.5" x2="5.5" y2="4"/><line x1="10.5" y1="1.5" x2="10.5" y2="4"/></svg>
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2.5" y="3" width="11" height="11" rx="2" /><line x1="2.5" y1="6.2" x2="13.5" y2="6.2" /><line x1="5.5" y1="1.5" x2="5.5" y2="4" /><line x1="10.5" y1="1.5" x2="10.5" y2="4" /></svg>
               </span>
             </div>
             <div style={{ fontSize: 28, fontWeight: 680, color: '#F2F3F5', letterSpacing: '-.02em', lineHeight: 1 }}>{kpis?.renewalCount ?? 0}</div>
@@ -250,8 +250,8 @@ export default function DashboardPage() {
           {TABS.map(({ key, label }) => {
             const count = key === 'All' ? tools.length
               : key === 'NOBUDGET' ? tools.filter((t) => t.paymentKind === 'NOBUDGET').length
-              : key === 'PREPAID' ? tools.filter((t) => t.paymentKind === 'PREPAID').length
-              : tools.filter((t) => ['MOSUB', 'CAPSUB'].includes(t.paymentKind)).length;
+                : key === 'PREPAID' ? tools.filter((t) => t.paymentKind === 'PREPAID').length
+                  : tools.filter((t) => ['MOSUB', 'CAPSUB'].includes(t.paymentKind)).length;
             const active = filter === key;
             return (
               <button key={key} onClick={() => setFilter(key)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: '8px 8px 0 0', border: 'none', background: active ? '#0E1014' : 'transparent', color: active ? '#E6E8EC' : '#6b707b', fontSize: 12.5, fontWeight: active ? 600 : 500, cursor: 'pointer', borderBottom: active ? '1px solid #0E1014' : 'none', marginBottom: active ? -1 : 0 }}>
@@ -377,6 +377,19 @@ export default function DashboardPage() {
   );
 }
 
+// Provider usage APIs (Railway's included) can return slightly different numbers for the
+// same query seconds apart — showing when this figure was last pulled makes clear it's one
+// live read, not a disagreement with e.g. the Usage History page reading the same provider
+// at a different instant.
+function fmtSyncAgo(iso: string): string {
+  const diffSec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diffSec < 60) return 'synced just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `synced ${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  return `synced ${diffHr}h ago`;
+}
+
 function ToolRow({ tool, statusMain, statusSubColor, barColor, renewMain, renewSub, renewColor, renewUrgent, payBg, payColor, payLabel, onEdit, onIntegration, onMenu }: any) {
   const [hover, setHover] = useState(false);
   const hasIntegration = !!tool.integration;
@@ -393,7 +406,7 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, renewMain, renewS
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             <span style={{ fontSize: 13.5, fontWeight: 580, color: '#E6E8EC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tool.name}</span>
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#34394a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.5 }}><path d="M6 3.5L10.5 8L6 12.5"/></svg>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#34394a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.5 }}><path d="M6 3.5L10.5 8L6 12.5" /></svg>
             {tool.alert && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F85149', flexShrink: 0, boxShadow: '0 0 0 3px rgba(248,81,73,.15)', display: 'inline-block' }} />}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -401,7 +414,7 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, renewMain, renewS
             {hasIntegration && (
               <button
                 onClick={(e: React.MouseEvent) => { e.stopPropagation(); onIntegration(); }}
-                title={syncError ? `Sync error: ${syncError}` : 'Integration active — click to configure'}
+                title={syncError ? `Sync error: ${syncError}` : 'Integration active - click to configure'}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 20, background: syncError ? 'rgba(248,81,73,.12)' : 'rgba(63,185,80,.1)', border: `1px solid ${syncError ? 'rgba(248,81,73,.3)' : 'rgba(63,185,80,.25)'}`, color: syncError ? '#F85149' : '#3FB950', fontSize: 9.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '.03em' }}
               >
                 <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'currentColor', flexShrink: 0, display: 'inline-block' }} />
@@ -422,7 +435,7 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, renewMain, renewS
       <div style={{ paddingRight: 18 }}>
         {tool.paymentKind === 'NOBUDGET' ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 550, padding: '4px 11px', borderRadius: 20, background: 'rgba(245,166,35,.1)', color: '#d99e3e', border: '1px solid rgba(245,166,35,.28)' }}>
-            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M8 2.5L14.5 13H1.5L8 2.5Z" strokeLinejoin="round"/><line x1="8" y1="6.5" x2="8" y2="9"/></svg>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M8 2.5L14.5 13H1.5L8 2.5Z" strokeLinejoin="round" /><line x1="8" y1="6.5" x2="8" y2="9" /></svg>
             No Budget Set
           </span>
         ) : tool.paymentKind === 'MOSUB' ? (
@@ -439,9 +452,12 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, renewMain, renewS
             <div style={{ height: 6, borderRadius: 999, background: '#1B1E26', overflow: 'hidden' }}>
               <div style={{ height: '100%', borderRadius: 999, width: `${Math.min(100, tool.barPct)}%`, background: barColor }} />
             </div>
+            {hasIntegration && tool.integration?.lastSyncAt && (
+              <div style={{ fontSize: 10, color: '#4a4f59', marginTop: 4 }}>{fmtSyncAgo(tool.integration.lastSyncAt)}</div>
+            )}
             {tool.alert && (
               <div style={{ marginTop: 5, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 20, background: 'rgba(248,81,73,.1)', border: '1px solid rgba(248,81,73,.28)' }}>
-                <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="#F85149" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.5L14.5 13H1.5L8 2.5Z" strokeLinejoin="round"/><line x1="8" y1="6.5" x2="8" y2="9"/></svg>
+                <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="#F85149" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.5L14.5 13H1.5L8 2.5Z" strokeLinejoin="round" /><line x1="8" y1="6.5" x2="8" y2="9" /></svg>
                 <span style={{ fontSize: 10, fontWeight: 650, color: '#F85149', letterSpacing: '.02em' }}>Alert: {tool.barPct}% used · threshold {tool.alertThresholdPct}%</span>
               </div>
             )}
@@ -454,7 +470,7 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, renewMain, renewS
         {tool.triggerEmail ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
             <span style={{ color: '#5E6AD2', display: 'flex', flexShrink: 0 }}>
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="1.8" y="3.5" width="12.4" height="9" rx="2"/><path d="M2.4 4.5L8 8.3l5.6-3.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="1.8" y="3.5" width="12.4" height="9" rx="2" /><path d="M2.4 4.5L8 8.3l5.6-3.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </span>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 12, color: '#c2c6cf', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tool.triggerEmail}</div>
@@ -482,7 +498,7 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, renewMain, renewS
             animation: renewColor === '#F85149' ? 'pulseRing 2.4s ease-in-out infinite' : 'pulseAmber 2.4s ease-in-out infinite',
           }}>
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke={renewColor} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2 2"/>
+              <circle cx="8" cy="8" r="6" /><path d="M8 5v3.5l2 2" />
             </svg>
             <div>
               <div style={{ fontSize: 12, fontWeight: 660, color: renewColor, lineHeight: 1 }}>{renewMain}</div>
@@ -513,7 +529,7 @@ function ThreeDotBtn({ onMenu }: { onMenu: (e: React.MouseEvent) => void }) {
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ width: 32, height: 32, borderRadius: 8, background: hover ? '#16181F' : 'transparent', border: 'none', color: hover ? '#9aa0ab' : '#6b707b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
     >
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="4" r="1.5" fill="currentColor"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="12" r="1.5" fill="currentColor"/></svg>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="4" r="1.5" fill="currentColor" /><circle cx="8" cy="8" r="1.5" fill="currentColor" /><circle cx="8" cy="12" r="1.5" fill="currentColor" /></svg>
     </button>
   );
 }
@@ -528,7 +544,7 @@ function DropBtn({ label, icon, danger, onClick }: { label: string; icon: ReactN
   );
 }
 
-function PencilIcon() { return <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11.5 2.5a2.1 2.1 0 0 1 3 3L5 15H2v-3L11.5 2.5Z"/></svg>; }
-function CopyIcon() { return <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="5" width="9" height="9" rx="2"/><path d="M4 11H3a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1"/></svg>; }
-function TrashIcon({ color = 'currentColor' }: { color?: string }) { return <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 13 6"/><path d="M5 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M4 6l1 9h6l1-9"/></svg>; }
-function PlugIcon() { return <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 1v3M10 1v3"/><rect x="3" y="4" width="10" height="5" rx="2"/><path d="M8 9v3"/><path d="M6 12h4"/></svg>; }
+function PencilIcon() { return <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11.5 2.5a2.1 2.1 0 0 1 3 3L5 15H2v-3L11.5 2.5Z" /></svg>; }
+function CopyIcon() { return <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="5" width="9" height="9" rx="2" /><path d="M4 11H3a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1" /></svg>; }
+function TrashIcon({ color = 'currentColor' }: { color?: string }) { return <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 13 6" /><path d="M5 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /><path d="M4 6l1 9h6l1-9" /></svg>; }
+function PlugIcon() { return <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 1v3M10 1v3" /><rect x="3" y="4" width="10" height="5" rx="2" /><path d="M8 9v3" /><path d="M6 12h4" /></svg>; }

@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { IntegrationProvider } from './provider.interface';
 import { RailwayProvider } from './providers/railway.provider';
 
-// Register new providers here — no other file needs to change.
+// Register new providers here - no other file needs to change.
 const PROVIDERS: Record<string, IntegrationProvider> = {
   RAILWAY: new RailwayProvider(),
 };
@@ -12,7 +13,7 @@ const PROVIDERS: Record<string, IntegrationProvider> = {
 export class IntegrationRunnerService {
   private readonly logger = new Logger(IntegrationRunnerService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   /** Run all active integrations. Called by the scheduler cron. */
   async runAll() {
@@ -22,7 +23,7 @@ export class IntegrationRunnerService {
     await Promise.allSettled(integrations.map((i) => this.runOne(i)));
   }
 
-  /** Run a single integration and update the tool's usedAmount + barPct (and capAmount/alertThresholdPct, if the provider exposes a budget). All amounts are USD — the app's base currency. */
+  /** Run a single integration and update the tool's usedAmount + barPct (and capAmount/alertThresholdPct, if the provider exposes a budget). All amounts are USD - the app's base currency. */
   async runOne(integration: { id: string; toolId: string; provider: string; config: any }) {
     const provider = PROVIDERS[integration.provider];
     if (!provider) {
@@ -31,10 +32,10 @@ export class IntegrationRunnerService {
     }
 
     try {
-      const config    = integration.config as Record<string, any>;
-      const amountUSD = await provider.fetchSpendUSD(config);
+      const config = integration.config as Record<string, any>;
+      const { amountUSD, breakdown, byProject } = await provider.fetchSpendUSD(config);
 
-      // Pull the latest budget cap too, if this provider can report one — keeps the
+      // Pull the latest budget cap too, if this provider can report one - keeps the
       // dashboard's cap in sync with whatever's configured on the provider's side,
       // not just whatever was captured when the tool was first connected.
       let hardLimitUSD: number | null = null;
@@ -71,7 +72,13 @@ export class IntegrationRunnerService {
         });
         await tx.toolIntegration.update({
           where: { id: integration.id },
-          data: { lastSyncAt: new Date(), lastSyncAmountUSD: amountUSD, lastError: null },
+          data: {
+            lastSyncAt: new Date(),
+            lastSyncAmountUSD: amountUSD,
+            lastSyncBreakdown: (breakdown as unknown as Prisma.InputJsonValue) ?? undefined,
+            lastSyncByProject: (byProject as unknown as Prisma.InputJsonValue) ?? undefined,
+            lastError: null,
+          },
         });
       });
 

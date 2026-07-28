@@ -3,9 +3,9 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AlertEngine {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
-  // Called after tool usage is updated — check and fire alerts
+  // Called after tool usage is updated - check and fire alerts
   async evaluateThreshold(toolId: string): Promise<boolean> {
     const tool = await this.prisma.tool.findUnique({
       where: { id: toolId },

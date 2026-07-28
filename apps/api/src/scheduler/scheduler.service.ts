@@ -15,15 +15,15 @@ export class SchedulerService {
     private prisma: PrismaService,
     private mail: MailService,
     private integrationRunner: IntegrationRunnerService,
-  ) {}
+  ) { }
 
-  // ── Integration data sync — every 15 minutes ─────────────────────
+  // ── Integration data sync - every 15 minutes ─────────────────────
   @Cron('*/15 * * * *')
   async syncIntegrations() {
     await this.integrationRunner.runAll();
   }
 
-  // ── Threshold breach check — every 5 minutes ──────────────────────
+  // ── Threshold breach check - every 5 minutes ──────────────────────
   @Cron('*/5 * * * *')
   async checkThresholdAlerts() {
     const tools = await this.prisma.tool.findMany({
@@ -58,7 +58,7 @@ export class SchedulerService {
     }
   }
 
-  // ── Renewal reminder — daily at 9 AM ─────────────────────────────
+  // ── Renewal reminder - daily at 9 AM ─────────────────────────────
   @Cron('0 9 * * *')
   async checkRenewalReminders() {
     const now = new Date();

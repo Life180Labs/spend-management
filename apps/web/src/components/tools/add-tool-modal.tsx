@@ -6,14 +6,14 @@ import { api } from '@/lib/api';
 /* ─── constants ─────────────────────────────────────────────────────────── */
 
 const CATEGORIES = [
-  { value: 'AI_LLM',        label: 'AI / LLM' },
-  { value: 'CLOUD_INFRA',   label: 'Cloud Infra' },
+  { value: 'AI_LLM', label: 'AI / LLM' },
+  { value: 'CLOUD_INFRA', label: 'Cloud Infra' },
   { value: 'COMMUNICATION', label: 'Communication' },
-  { value: 'DEV_TOOLS',     label: 'Dev Tools' },
-  { value: 'DESIGN',        label: 'Design' },
-  { value: 'HOSTING',       label: 'Hosting' },
-  { value: 'MONITORING',    label: 'Monitoring' },
-  { value: 'OTHER',         label: 'Other' },
+  { value: 'DEV_TOOLS', label: 'Dev Tools' },
+  { value: 'DESIGN', label: 'Design' },
+  { value: 'HOSTING', label: 'Hosting' },
+  { value: 'MONITORING', label: 'Monitoring' },
+  { value: 'OTHER', label: 'Other' },
 ];
 
 /* ─── types ──────────────────────────────────────────────────────────────── */
@@ -129,38 +129,38 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
   const provider = tool?.integration?.provider ?? null;
 
   /* ── form state ─────────────────────────────────────────────────────── */
-  const [name,             setName]             = useState(tool?.name ?? '');
-  const [vendor,           setVendor]           = useState(tool?.vendor ?? '');
-  const [category,         setCategory]         = useState(tool?.category ?? 'AI_LLM');
-  const [paymentKind,      setPaymentKind]      = useState(tool?.paymentKind ?? 'PREPAID');
-  const [capAmount,        setCapAmount]        = useState(tool?.capAmount ? String(tool.capAmount) : '');
-  const [monthlyAmount,    setMonthlyAmount]    = useState(tool?.monthlyAmount ? String(tool.monthlyAmount) : '');
-  const [alertPct,         setAlertPct]         = useState(String(tool?.alertThresholdPct ?? 80));
-  const [emailUser,        setEmailUser]        = useState(
+  const [name, setName] = useState(tool?.name ?? '');
+  const [vendor, setVendor] = useState(tool?.vendor ?? '');
+  const [category, setCategory] = useState(tool?.category ?? 'AI_LLM');
+  const [paymentKind, setPaymentKind] = useState(tool?.paymentKind ?? 'PREPAID');
+  const [capAmount, setCapAmount] = useState(tool?.capAmount ? String(tool.capAmount) : '');
+  const [monthlyAmount, setMonthlyAmount] = useState(tool?.monthlyAmount ? String(tool.monthlyAmount) : '');
+  const [alertPct, setAlertPct] = useState(String(tool?.alertThresholdPct ?? 80));
+  const [emailUser, setEmailUser] = useState(
     tool?.triggerEmail ? tool.triggerEmail.replace(/@life180labs\.com$/i, '') : ''
   );
-  const [renewalDate,      setRenewalDate]      = useState(
+  const [renewalDate, setRenewalDate] = useState(
     tool?.renewalDate ? new Date(tool.renewalDate).toISOString().split('T')[0] : ''
   );
 
   /* ── add-mode setup ─────────────────────────────────────────────────── */
-  const [mode,          setMode]          = useState<'api' | 'manual'>('api');
-  const [apiKey,        setApiKey]        = useState('');
-  const [fetchStatus,   setFetchStatus]   = useState<'idle' | 'loading' | 'ok' | 'err'>('idle');
-  const [fetchError,    setFetchError]    = useState('');
-  const [limits,        setLimits]        = useState<Limits | null>(null);
+  const [mode, setMode] = useState<'api' | 'manual'>('api');
+  const [apiKey, setApiKey] = useState('');
+  const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'ok' | 'err'>('idle');
+  const [fetchError, setFetchError] = useState('');
+  const [limits, setLimits] = useState<Limits | null>(null);
 
   /* ── edit-mode refresh ──────────────────────────────────────────────── */
-  const [refreshing,    setRefreshing]    = useState(false);
-  const [refreshErr,    setRefreshErr]    = useState('');
-  const [refreshed,     setRefreshed]     = useState<Limits | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshErr, setRefreshErr] = useState('');
+  const [refreshed, setRefreshed] = useState<Limits | null>(null);
 
   /* ── submit ─────────────────────────────────────────────────────────── */
-  const [error,   setError]   = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [depts,   setDepts]   = useState<{ id: string }[]>([]);
+  const [depts, setDepts] = useState<{ id: string }[]>([]);
 
-  useEffect(() => { api.get<any[]>('/departments').then(setDepts).catch(() => {}); }, []);
+  useEffect(() => { api.get<any[]>('/departments').then(setDepts).catch(() => { }); }, []);
 
   /* ── fetch limits preview (add mode) ─────────────────────────────────── */
   async function fetchLimits() {
@@ -177,7 +177,7 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
         setFetchStatus('ok');
       } else {
         setFetchStatus('err');
-        setFetchError('No limits returned — make sure your Railway account has usage limits set.');
+        setFetchError('No limits returned - make sure your Railway account has usage limits set.');
       }
     } catch (e: any) {
       setFetchStatus('err');
@@ -223,7 +223,7 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
       return;
     }
 
-    if (!name.trim())   { setError('Tool name is required'); return; }
+    if (!name.trim()) { setError('Tool name is required'); return; }
     if (!vendor.trim()) { setError('Vendor is required'); return; }
     if (needsEmail && !emailUser.trim()) { setError('Notification email is required'); return; }
     if (paymentKind === 'PREPAID' && mode === 'api' && fetchStatus !== 'ok') {
@@ -238,8 +238,8 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
 
     setError(''); setLoading(true);
     try {
-      const cap   = mode === 'api' && limits ? limits.computeHardLimitUSD : (capAmount ? Number(capAmount) : undefined);
-      const alert = mode === 'api' && limits ? limits.alertThresholdPct   : (paymentKind === 'PREPAID' ? Number(alertPct) : undefined);
+      const cap = mode === 'api' && limits ? limits.computeHardLimitUSD : (capAmount ? Number(capAmount) : undefined);
+      const alert = mode === 'api' && limits ? limits.alertThresholdPct : (paymentKind === 'PREPAID' ? Number(alertPct) : undefined);
 
       const payload: any = {
         name: name.trim(), vendor: vendor.trim(), category, paymentKind,
@@ -277,7 +277,7 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
         {/* Header */}
         <div style={S.header}>
           <span style={{ fontSize: 14, fontWeight: 600, color: '#E8EAF0' }}>
-            {isEdit ? `Edit — ${tool!.name}` : 'Add Tool'}
+            {isEdit ? `Edit - ${tool!.name}` : 'Add Tool'}
           </span>
           <button onClick={onClose} type="button"
             style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px' }}>
@@ -285,7 +285,7 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
           </button>
         </div>
 
-        {/* Scrollable body — everything is one <form> */}
+        {/* Scrollable body - everything is one <form> */}
         <form id="tool-form-inner" onSubmit={handleSubmit} style={S.body} noValidate>
 
           {/* ── Alert banner (edit only) ─────────────────────────────── */}
@@ -293,7 +293,7 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
             <div style={{ padding: '10px 14px', backgroundColor: 'rgba(248,81,73,0.08)', border: '1px solid rgba(248,81,73,0.22)', borderRadius: 9 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#F85149', marginBottom: 3 }}>Alert Active</div>
               <div style={{ fontSize: 12, color: '#b06060' }}>
-                Threshold of {tool.alertThresholdPct}% has been breached — currently at {tool.barPct}% used.
+                Threshold of {tool.alertThresholdPct}% has been breached - currently at {tool.barPct}% used.
               </div>
             </div>
           )}
@@ -302,7 +302,7 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
           {error && <div style={S.error}>{error}</div>}
 
           {/* ══════════════════════════════════════════════════════════
-              1. TOOL DETAILS — always first
+              1. TOOL DETAILS - always first
           ══════════════════════════════════════════════════════════ */}
           <div>
             <div style={S.sectionTitle}>Tool details</div>
@@ -351,10 +351,10 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
           </div>
 
           {/* ══════════════════════════════════════════════════════════
-              2. BUDGET SETUP — second, depends on payment type
+              2. BUDGET SETUP - second, depends on payment type
           ══════════════════════════════════════════════════════════ */}
 
-          {/* ADD mode — prepaid: show connect/manual toggle */}
+          {/* ADD mode - prepaid: show connect/manual toggle */}
           {!isEdit && paymentKind === 'PREPAID' && (
             <>
               <div>
@@ -444,7 +444,7 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
             </>
           )}
 
-          {/* EDIT mode — prepaid: read-only budget display */}
+          {/* EDIT mode - prepaid: read-only budget display */}
           {isEdit && paymentKind === 'PREPAID' && (
             <div>
               <div style={S.sectionTitle}>Budget & limits</div>
@@ -536,15 +536,15 @@ export function AddToolModal({ onClose, onCreated, tool }: Props) {
           <div style={{ height: 4 }} />
         </form>
 
-        {/* Footer — outside the form, buttons use form= attribute */}
+        {/* Footer - outside the form, buttons use form= attribute */}
         <div style={S.footer}>
           <button type="button" onClick={onClose} style={S.btnSecondary}>Cancel</button>
           <button type="submit" form="tool-form-inner" disabled={loading}
             style={{ ...S.btnPrimary, opacity: loading ? 0.7 : 1 }}>
             {loading ? 'Saving…'
               : isEdit ? 'Save changes'
-              : mode === 'api' ? 'Add & connect'
-              : 'Add tool'}
+                : mode === 'api' ? 'Add & connect'
+                  : 'Add tool'}
           </button>
         </div>
 

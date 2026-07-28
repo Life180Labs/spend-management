@@ -19,8 +19,8 @@ const NAV = [
     icon: <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 2.5c-2 0-3.2 1.4-3.2 3.3 0 2.5-1 3.5-1.4 3.9-.1.2.1.4.4.4h8.4c.3 0 .5-.2.4-.4-.4-.4-1.4-1.4-1.4-3.9C11.2 3.9 10 2.5 8 2.5Z" strokeLinejoin="round"/><path d="M6.7 12.2a1.4 1.4 0 0 0 2.6 0" strokeLinecap="round"/></svg>,
   },
   {
-    label: 'Reports', href: '/reports',
-    icon: <svg width="17" height="17" viewBox="0 0 16 16" fill="none"><rect x="2" y="8" width="3" height="6" rx="1.1" fill="currentColor"/><rect x="6.5" y="4.5" width="3" height="9.5" rx="1.1" fill="currentColor" opacity=".6"/><rect x="11" y="2.5" width="3" height="11.5" rx="1.1" fill="currentColor"/></svg>,
+    label: 'Usage History', href: '/usage-history',
+    icon: <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8.5" r="6"/><path d="M8 5.2v3.3l2.2 1.3"/><path d="M5.5 1.2h5"/></svg>,
   },
   {
     label: 'Settings', href: '/settings',

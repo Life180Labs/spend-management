@@ -16,7 +16,7 @@ export class AuthController {
   constructor(
     private auth: AuthService,
     private config: ConfigService,
-  ) {}
+  ) { }
 
   @Post('signup')
   signup(@Body() dto: SignupDto) {
@@ -46,7 +46,7 @@ export class AuthController {
   @Get('google')
   @UseGuards(AuthGuard('google'))
   googleLogin() {
-    // Passport redirects to Google — nothing to do here
+    // Passport redirects to Google - nothing to do here
   }
 
   @Get('google/callback')

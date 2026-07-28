@@ -4,7 +4,7 @@
 -- confirmed against Railway's own API (no lossy division needed). Every other
 -- money-bearing table (budgets, spend_requests, billing_records, ...) was empty.
 
--- Drop the now-redundant USD companion columns — usedAmount/capAmount ARE USD now.
+-- Drop the now-redundant USD companion columns - usedAmount/capAmount ARE USD now.
 ALTER TABLE "tools" DROP COLUMN "usedAmountUSD";
 ALTER TABLE "tools" DROP COLUMN "capAmountUSD";
 
@@ -16,7 +16,7 @@ ALTER TABLE "organizations" ALTER COLUMN "currency" SET DEFAULT 'USD';
 ALTER TABLE "spend_requests" ALTER COLUMN "currency" SET DEFAULT 'USD';
 
 -- Existing org and tool data: convert the only two tools that carry real data.
--- Railway tool 2a6c18c0: confirmed live via Railway's API — hard limit $18,
+-- Railway tool 2a6c18c0: confirmed live via Railway's API - hard limit $18,
 -- estimated spend $16.11 at time of writing.
 UPDATE "tools" SET "usedAmount" = 16.11, "capAmount" = 18
   WHERE id = '2a6c18c0-abb0-4723-bfeb-442395257443';
@@ -24,7 +24,7 @@ UPDATE "tool_integrations" SET "lastSyncAmountUSD" = 16.11
   WHERE "toolId" = '2a6c18c0-abb0-4723-bfeb-442395257443';
 
 -- Railway tool dc2401d6: broken/misconfigured integration (bad token, never
--- synced successfully) — its stored figures were stale INR test data. Convert
+-- synced successfully) - its stored figures were stale INR test data. Convert
 -- at the FX rate already used as this app's fallback constant (94.4) since
 -- there's no live authoritative USD figure to fall back on.
 UPDATE "tools" SET "usedAmount" = ROUND(("usedAmount" / 94.4)::numeric, 2)::float,

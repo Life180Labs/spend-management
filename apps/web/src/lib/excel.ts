@@ -82,7 +82,7 @@ export function exportBillingHistory(
 
   const data = rows.map((r) => ({
     Tool: r.tool?.name || 'Deleted tool',
-    Category: CAT_LABELS[r.tool?.category || ''] || r.tool?.category || '—',
+    Category: CAT_LABELS[r.tool?.category || ''] || r.tool?.category || '-',
     Period: r.monthLabel,
     [`Amount (${sym})`]: fmt(r.amount),
     Status: r.status === 'PAID' ? 'Paid' : 'Pending',
@@ -134,12 +134,12 @@ export function exportToolsList(
       'Payment Type': PAY_LABELS[t.paymentKind] || t.paymentKind,
       [`Used (${sym})`]: fmt(used),
       [`Budget Cap (${sym})`]: cap > 0 ? fmt(cap) : 'Uncapped',
-      '% Used': t.paymentKind !== 'NOBUDGET' ? `${t.barPct}%` : '—',
-      'Alert Threshold': t.paymentKind !== 'NOBUDGET' ? `${t.alertThresholdPct}%` : '—',
+      '% Used': t.paymentKind !== 'NOBUDGET' ? `${t.barPct}%` : '-',
+      'Alert Threshold': t.paymentKind !== 'NOBUDGET' ? `${t.alertThresholdPct}%` : '-',
       'Alert Active': t.alert ? 'Yes' : 'No',
-      'Notify Email': t.triggerEmail || '—',
-      'Renewal Date': t.renewalDate ? new Date(t.renewalDate).toLocaleDateString('en-IN') : '—',
-      'Days Until Renewal': t.daysUntilRenewal ?? '—',
+      'Notify Email': t.triggerEmail || '-',
+      'Renewal Date': t.renewalDate ? new Date(t.renewalDate).toLocaleDateString('en-IN') : '-',
+      'Days Until Renewal': t.daysUntilRenewal ?? '-',
     };
   });
 

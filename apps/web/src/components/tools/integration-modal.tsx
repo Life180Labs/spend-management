@@ -78,7 +78,7 @@ export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props)
             setAppliedLimits(limits);
           }
         } catch {
-          // Limits fetch is best-effort — don't fail the whole connect flow
+          // Limits fetch is best-effort - don't fail the whole connect flow
         }
       }
 
@@ -120,13 +120,13 @@ export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props)
 
   function friendlyError(raw: string): string {
     if (/failed for every measurement this cycle/i.test(raw)) {
-      return "Railway is temporarily rate-limiting our requests — we kept your last known spend and will try again on the next sync.";
+      return "Railway is temporarily rate-limiting our requests - this will resolve itself on the next sync.";
     }
     if (/does not have permission to read projects or billing data/i.test(raw)) {
       return "This API token can't read usage data. Use a personal API token from railway.com → Account Settings → API Tokens.";
     }
     if (/rate limit/i.test(raw)) {
-      return "Railway is rate-limiting our requests right now — this will resolve itself on the next sync.";
+      return "Railway is rate-limiting our requests - this will resolve itself on the next sync.";
     }
     return raw;
   }
@@ -209,7 +209,7 @@ export function IntegrationModal({ toolId, toolName, onClose, onSynced }: Props)
             {appliedLimits && (
               <div style={{ borderRadius: 12, padding: '12px 14px', background: 'rgba(94,106,210,.08)', border: '1px solid rgba(94,106,210,.28)', marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#9aa2ef" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L6 9l-3-3"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#9aa2ef" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L6 9l-3-3" /></svg>
                   <span style={{ fontSize: 12, fontWeight: 650, color: '#9aa2ef' }}>Budget synced from Railway</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px' }}>
@@ -336,8 +336,8 @@ function LimitRow({ label, usd, pct }: { label: string; usd: number; pct?: numbe
 function PlugIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 1v3M10 1v3"/><rect x="3" y="4" width="10" height="5" rx="2"/>
-      <path d="M8 9v3"/><path d="M6 12h4"/>
+      <path d="M6 1v3M10 1v3" /><rect x="3" y="4" width="10" height="5" rx="2" />
+      <path d="M8 9v3" /><path d="M6 12h4" />
     </svg>
   );
 }
@@ -345,8 +345,8 @@ function PlugIcon() {
 function UnplugIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5.5 1v3M10.5 1v3"/><path d="M3 4h10v4a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V4Z"/>
-      <path d="M8 12v3"/><path d="M2 2l12 12"/>
+      <path d="M5.5 1v3M10.5 1v3" /><path d="M3 4h10v4a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V4Z" />
+      <path d="M8 12v3" /><path d="M2 2l12 12" />
     </svg>
   );
 }
@@ -354,7 +354,7 @@ function UnplugIcon() {
 function EyeIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5Z"/><circle cx="8" cy="8" r="2"/>
+      <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5Z" /><circle cx="8" cy="8" r="2" />
     </svg>
   );
 }
@@ -362,9 +362,9 @@ function EyeIcon() {
 function EyeOffIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M13.5 13.5 2.5 2.5"/><path d="M6.4 6.5A2 2 0 0 0 9.5 9.6"/>
-      <path d="M4 4.6C2.3 5.7 1 8 1 8s2.5 5 7 5c1.4 0 2.7-.4 3.8-1.1"/>
-      <path d="M13 11.5C14.3 10.3 15 8 15 8s-2.5-5-7-5c-.6 0-1.2.1-1.8.2"/>
+      <path d="M13.5 13.5 2.5 2.5" /><path d="M6.4 6.5A2 2 0 0 0 9.5 9.6" />
+      <path d="M4 4.6C2.3 5.7 1 8 1 8s2.5 5 7 5c1.4 0 2.7-.4 3.8-1.1" />
+      <path d="M13 11.5C14.3 10.3 15 8 15 8s-2.5-5-7-5c-.6 0-1.2.1-1.8.2" />
     </svg>
   );
 }

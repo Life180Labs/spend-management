@@ -1,4 +1,4 @@
-// Spend Management Platform — Prisma Schema
+// Spend Management Platform - Prisma Schema
 generator client {
   provider = "prisma-client-js"
 }
@@ -37,7 +37,7 @@ enum PaymentKind {
   PREPAID    // usage-based cap
   CAPSUB     // monthly cap subscription
   MOSUB      // flat monthly subscription
-  NOBUDGET   // uncapped — triggers "needs budget" alert
+  NOBUDGET   // uncapped - triggers "needs budget" alert
 }
 
 enum ToolCategory {
@@ -291,6 +291,8 @@ model ToolIntegration {
   syncEveryMinutes  Int       @default(15)
   lastSyncAt        DateTime?
   lastSyncAmountUSD Float?
+  lastSyncBreakdown Json?     // per-measurement breakdown from the last sync, e.g. [{measurement, amountUSD, rawValue}]
+  lastSyncByProject Json?     // per-project breakdown from the last sync, e.g. [{projectId, projectName, amountUSD}]
   lastError         String?
   isActive          Boolean   @default(true)
   createdAt         DateTime  @default(now())

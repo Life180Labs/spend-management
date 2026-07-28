@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuditService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async log(
     orgId: string,
@@ -15,7 +15,7 @@ export class AuditService {
     after: any,
     meta?: { ipAddress?: string; userAgent?: string },
   ) {
-    // Async fire-and-forget — audit failures must never block the main operation
+    // Async fire-and-forget - audit failures must never block the main operation
     this.prisma.auditLog
       .create({
         data: {

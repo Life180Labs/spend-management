@@ -9,7 +9,7 @@ export class ApprovalEngine {
     private prisma: PrismaService,
     private budget: BudgetEngine,
     private notifications: NotificationsService,
-  ) {}
+  ) { }
 
   async submit(requestId: string, actorId: string) {
     const req = await this.getRequest(requestId);
@@ -237,7 +237,7 @@ export class ApprovalEngine {
   }
 
   private async assertApproverAuthorized(step: any, approverId: string, req: any) {
-    // For now: trust the approverId from JWT — RBAC enforcement on the controller layer
+    // For now: trust the approverId from JWT - RBAC enforcement on the controller layer
     // In production: verify approverId matches step.approverId or has step.approverRole
   }
 }

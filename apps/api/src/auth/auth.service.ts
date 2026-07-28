@@ -17,7 +17,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwt: JwtService,
     private config: ConfigService,
-  ) {}
+  ) { }
 
   async signup(dto: SignupDto) {
     const existing = await this.prisma.user.findFirst({
@@ -126,7 +126,7 @@ export class AuthService {
       const org = await this.prisma.organization.findFirst({
         orderBy: { createdAt: 'asc' },
       });
-      if (!org) throw new Error('No organization found — run the seed first');
+      if (!org) throw new Error('No organization found - run the seed first');
 
       const initials = googleUser.name
         .split(' ')
@@ -198,7 +198,7 @@ export class AuthService {
   }
 
   private async hashToken(token: string): Promise<string> {
-    // Simple hash — not bcrypt (bcrypt is too slow for token lookup)
+    // Simple hash - not bcrypt (bcrypt is too slow for token lookup)
     const crypto = await import('crypto');
     return crypto.createHash('sha256').update(token).digest('hex');
   }

@@ -57,13 +57,13 @@ export default function AlertsPage() {
             <div style={{ width: 38, height: 38, borderRadius: 10, background: t.monoBgColor, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>{t.monoInitials}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: '#F2F3F5' }}>{t.name}</div>
-              <div style={{ fontSize: 12, color: '#c98a86', marginTop: 2 }}>At {t.barPct}% — breached {t.alertThresholdPct}% threshold</div>
+              <div style={{ fontSize: 12, color: '#c98a86', marginTop: 2 }}>At {t.barPct}% - breached {t.alertThresholdPct}% threshold</div>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
               <div style={{ fontSize: 11, color: '#878c96' }}>Notifies</div>
-              <div style={{ fontSize: 12, color: '#c2c6cf', fontWeight: 500 }}>{t.triggerEmail || '—'}</div>
+              <div style={{ fontSize: 12, color: '#c2c6cf', fontWeight: 500 }}>{t.triggerEmail || '-'}</div>
             </div>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#5e636e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M6 3.5L10.5 8L6 12.5"/></svg>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#5e636e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M6 3.5L10.5 8L6 12.5" /></svg>
           </Link>
         ))}
       </div>
@@ -82,7 +82,7 @@ export default function AlertsPage() {
             <div style={{ width: 38, height: 38, borderRadius: 10, background: t.monoBgColor, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>{t.monoInitials}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: '#F2F3F5' }}>{t.name}</div>
-              <div style={{ fontSize: 12, color: '#9aa0ab', marginTop: 2 }}>No budget configured — uncapped spend</div>
+              <div style={{ fontSize: 12, color: '#9aa0ab', marginTop: 2 }}>No budget configured - uncapped spend</div>
             </div>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: '#d99e3e', background: 'rgba(245,166,35,.1)', border: '1px solid rgba(245,166,35,.28)', padding: '5px 12px', borderRadius: 8, flexShrink: 0 }}>Set budget →</span>
           </Link>
@@ -106,7 +106,7 @@ export default function AlertsPage() {
                 <div style={{ fontSize: 11, color: '#6b707b' }}>{CAT_LABELS[t.category] || t.category}</div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: renewColor(t.daysUntilRenewal) }}>{t.renewalDate ? fmtDate(t.renewalDate) : '—'}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: renewColor(t.daysUntilRenewal) }}>{t.renewalDate ? fmtDate(t.renewalDate) : '-'}</div>
                 <div style={{ fontSize: 11, color: '#6b707b' }}>{t.daysUntilRenewal !== null ? `in ${t.daysUntilRenewal}d` : ''}</div>
               </div>
             </Link>

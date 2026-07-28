@@ -32,7 +32,7 @@ export default function ReportsPage() {
     fetch('https://api.frankfurter.app/latest?from=USD&to=INR')
       .then((r) => r.json())
       .then((d: any) => { if (d?.rates?.INR) setFxRate(d.rates.INR); })
-      .catch(() => {});
+      .catch(() => { });
     const onCurrencyChange = (e: Event) => setCurrency((e as CustomEvent<'INR' | 'USD'>).detail);
     window.addEventListener('spend_currency_change', onCurrencyChange);
     return () => window.removeEventListener('spend_currency_change', onCurrencyChange);
@@ -144,7 +144,7 @@ export default function ReportsPage() {
                   <div style={{ width: 30, height: 30, borderRadius: 8, background: r.tool?.monoBgColor || '#5E6AD2', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11.5, fontWeight: 700, flexShrink: 0 }}>{r.tool?.monoInitials || '?'}</div>
                   <span style={{ fontSize: 13, fontWeight: 550, color: '#E6E8EC' }}>{r.tool?.name || 'Deleted tool'}</span>
                 </div>
-                <div style={{ fontSize: 12, color: '#9aa0ab' }}>{CAT_LABELS[r.tool?.category || ''] || r.tool?.category || '—'}</div>
+                <div style={{ fontSize: 12, color: '#9aa0ab' }}>{CAT_LABELS[r.tool?.category || ''] || r.tool?.category || '-'}</div>
                 <div style={{ fontSize: 12, color: '#9aa0ab' }}>{r.monthLabel}</div>
                 <div style={{ fontSize: 13.5, fontWeight: 650, color: '#F2F3F5', fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(r.amount)}</div>
                 <div>
@@ -179,7 +179,7 @@ function DownloadBtn({ onClick, label }: { onClick: () => void; label: string })
       style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 9, background: hover ? '#1f2330' : '#171a22', border: '1px solid #2a2e3d', color: '#9aa2ef', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', transition: 'all .15s', whiteSpace: 'nowrap' }}
     >
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M8 2v8M5 7l3 3 3-3"/><rect x="2" y="12" width="12" height="2" rx="1"/>
+        <path d="M8 2v8M5 7l3 3 3-3" /><rect x="2" y="12" width="12" height="2" rx="1" />
       </svg>
       {label}
     </button>

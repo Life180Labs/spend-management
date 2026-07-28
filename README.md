@@ -4,12 +4,12 @@ An internal SaaS platform for tracking and managing AI tool spend across an orga
 
 ## What it does
 
-- **Tool registry** — add every AI/cloud tool the team uses, with payment type (usage-based, subscription, or no budget)
-- **Budget tracking** — set spend caps and alert thresholds; usage synced automatically from connected providers
-- **Automated alerts** — email notifications when a tool breaches its threshold, and renewal reminders before subscription dates
-- **Provider integrations** — connect accounts via API key (Railway supported; more providers planned) to pull live usage limits
-- **Spend reports** — monthly summaries with export to spreadsheet
-- **INR / USD toggle** — live FX rate via Frankfurter (ECB), user preference persisted across sessions
+- **Tool registry** - add every AI/cloud tool the team uses, with payment type (usage-based, subscription, or no budget)
+- **Budget tracking** - set spend caps and alert thresholds; usage synced automatically from connected providers
+- **Automated alerts** - email notifications when a tool breaches its threshold, and renewal reminders before subscription dates
+- **Provider integrations** - connect accounts via API key (Railway supported; more providers planned) to pull live usage limits
+- **Spend reports** - monthly summaries with export to spreadsheet
+- **INR / USD toggle** - live FX rate via Frankfurter (ECB), user preference persisted across sessions
 
 ## Tech stack
 
@@ -28,8 +28,8 @@ An internal SaaS platform for tracking and managing AI tool spend across an orga
 ```
 spend-management/
 ├── apps/
-│   ├── api/          # NestJS backend — port 4000
-│   └── web/          # Next.js frontend — port 3000
+│   ├── api/          # NestJS backend - port 4000
+│   └── web/          # Next.js frontend - port 3000
 ├── docker-compose.yml
 └── package.json
 ```
@@ -109,7 +109,7 @@ pnpm dev        # runs on http://localhost:3000
 | Job | Schedule | Description |
 |---|---|---|
 | Integration sync | Every 15 min | Pulls latest usage from connected provider APIs |
-| Threshold alerts | Every 5 min | Sends email if a tool's usage has breached its alert % (deduplicated — one email per tool per 24 h) |
+| Threshold alerts | Every 5 min | Sends email if a tool's usage has breached its alert % (deduplicated - one email per tool per 24 h) |
 | Renewal reminders | Daily at 9 AM | Emails if a subscription renews within the next 5 days |
 
 ## Provider integrations
