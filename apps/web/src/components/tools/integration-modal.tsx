@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Loader2, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { api } from '@/lib/api';
-import { INTEGRATION_PROVIDERS } from '@/lib/integration-providers';
+import { INTEGRATION_PROVIDERS, matchProviderByVendor } from '@/lib/integration-providers';
 
 interface Integration {
   id: string;
@@ -40,7 +40,7 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
   // If the tool's vendor unambiguously matches one supported integration, there's nothing to
   // choose - lock to it. Only fall back to a picker when the vendor doesn't match either
   // (e.g. an older tool added before vendor auto-fill existed).
-  const vendorMatch = PROVIDERS.find((p) => p.vendor.toLowerCase() === toolVendor?.trim().toLowerCase());
+  const vendorMatch = matchProviderByVendor(toolVendor);
 
   const [integration, setIntegration] = useState<Integration | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
@@ -56,6 +56,9 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
   // Once an integration exists, its provider is fixed too - never let the dropdown offer
   // to silently re-point an already-connected tool at a different provider.
   const providerLocked = !!integration || !!vendorMatch;
+  // A vendor like Namecheap has no API at all - nothing to connect, so the whole
+  // form (provider select, token field, sync actions) doesn't apply here.
+  const noApiAvailable = !integration && !!vendorMatch && !vendorMatch.hasApi;
 
   async function fetchIntegration() {
     try {
@@ -224,6 +227,10 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
                   </div>
                 )}
               </div>
+            ) : noApiAvailable ? (
+              <div style={{ borderRadius: 12, padding: '10px 14px', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', marginBottom: 16, fontSize: 12, color: '#6b707b' }}>
+                {vendorMatch!.label} doesn't have an API to connect to - this tool is tracked manually (Subscription payment type, entered on the tool itself).
+              </div>
             ) : (
               <div style={{ borderRadius: 12, padding: '10px 14px', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', marginBottom: 16, fontSize: 12, color: '#6b707b' }}>
                 Not connected. Enter your API credentials below to start syncing spend data automatically.
@@ -254,94 +261,98 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
               </div>
             )}
 
-            {/* Provider */}
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontSize: 11.5, color: '#9aa0ab', marginBottom: 6 }}>Provider</label>
-              {providerLocked ? (
-                <div style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 13, boxSizing: 'border-box', color: '#8a909b' }}>
-                  {selectedProvider.label}
+            {!noApiAvailable && (
+              <>
+                {/* Provider */}
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: 'block', fontSize: 11.5, color: '#9aa0ab', marginBottom: 6 }}>Provider</label>
+                  {providerLocked ? (
+                    <div style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 13, boxSizing: 'border-box', color: '#8a909b' }}>
+                      {selectedProvider.label}
+                    </div>
+                  ) : (
+                    <select
+                      value={provider}
+                      onChange={(e) => setProvider(e.target.value)}
+                      style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 13 }}
+                    >
+                      {PROVIDERS.filter((p) => p.hasApi).map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </select>
+                  )}
                 </div>
-              ) : (
-                <select
-                  value={provider}
-                  onChange={(e) => setProvider(e.target.value)}
-                  style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 13 }}
-                >
-                  {PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                </select>
-              )}
-            </div>
 
-            {/* API Token */}
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 11.5, color: '#9aa0ab', marginBottom: 6 }}>
-                {selectedProvider.tokenLabel}
-                {isConnected && <span style={{ color: '#4a4f59', marginLeft: 6 }}>(re-enter to update)</span>}
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showToken ? 'text' : 'password'}
-                  value={apiToken}
-                  onChange={(e) => setApiToken(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }}
-                  placeholder={isConnected ? `Enter new ${selectedProvider.tokenLabel.toLowerCase()} to update` : selectedProvider.placeholder}
-                  style={{ ...S, width: '100%', padding: '9px 40px 9px 12px', borderRadius: 10, fontSize: 13, boxSizing: 'border-box' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowToken(!showToken)}
-                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#5e636e', cursor: 'pointer', padding: 2 }}
-                >
-                  {showToken ? <EyeOffIcon /> : <EyeIcon />}
-                </button>
-              </div>
-              <p style={{ fontSize: 11, color: '#4a4f59', marginTop: 6 }}>
-                {selectedProvider.helpText}
-              </p>
-            </div>
+                {/* API Token */}
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: 'block', fontSize: 11.5, color: '#9aa0ab', marginBottom: 6 }}>
+                    {selectedProvider.tokenLabel}
+                    {isConnected && <span style={{ color: '#4a4f59', marginLeft: 6 }}>(re-enter to update)</span>}
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showToken ? 'text' : 'password'}
+                      value={apiToken}
+                      onChange={(e) => setApiToken(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }}
+                      placeholder={isConnected ? `Enter new ${selectedProvider.tokenLabel.toLowerCase()} to update` : selectedProvider.placeholder}
+                      style={{ ...S, width: '100%', padding: '9px 40px 9px 12px', borderRadius: 10, fontSize: 13, boxSizing: 'border-box' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowToken(!showToken)}
+                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#5e636e', cursor: 'pointer', padding: 2 }}
+                    >
+                      {showToken ? <EyeOffIcon /> : <EyeIcon />}
+                    </button>
+                  </div>
+                  <p style={{ fontSize: 11, color: '#4a4f59', marginTop: 6 }}>
+                    {selectedProvider.helpText}
+                  </p>
+                </div>
 
-            {/* Actions */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {isConnected && (
-                <button
-                  onClick={handleSyncNow}
-                  disabled={syncing}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'rgba(94,106,210,.12)', border: '1px solid rgba(94,106,210,.22)', color: '#9aa2ef', fontSize: 12.5, fontWeight: 550, cursor: syncing ? 'not-allowed' : 'pointer', opacity: syncing ? 0.7 : 1, flexShrink: 0 }}
-                >
-                  {syncing
-                    ? <Loader2 size={13} className="animate-spin" />
-                    : <RefreshCw size={13} />}
-                  Sync now
-                </button>
-              )}
+                {/* Actions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {isConnected && (
+                    <button
+                      onClick={handleSyncNow}
+                      disabled={syncing}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'rgba(94,106,210,.12)', border: '1px solid rgba(94,106,210,.22)', color: '#9aa2ef', fontSize: 12.5, fontWeight: 550, cursor: syncing ? 'not-allowed' : 'pointer', opacity: syncing ? 0.7 : 1, flexShrink: 0 }}
+                    >
+                      {syncing
+                        ? <Loader2 size={13} className="animate-spin" />
+                        : <RefreshCw size={13} />}
+                      Sync now
+                    </button>
+                  )}
 
-              <div style={{ flex: 1 }} />
+                  <div style={{ flex: 1 }} />
 
-              {isConnected && (
-                <button
-                  onClick={handleDisconnect}
-                  disabled={removing}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'rgba(248,81,73,.08)', border: '1px solid rgba(248,81,73,.18)', color: '#F85149', fontSize: 12.5, fontWeight: 550, cursor: removing ? 'not-allowed' : 'pointer', opacity: removing ? 0.7 : 1, flexShrink: 0 }}
-                >
-                  {removing ? <Loader2 size={13} className="animate-spin" /> : <UnplugIcon />}
-                  Disconnect
-                </button>
-              )}
+                  {isConnected && (
+                    <button
+                      onClick={handleDisconnect}
+                      disabled={removing}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'rgba(248,81,73,.08)', border: '1px solid rgba(248,81,73,.18)', color: '#F85149', fontSize: 12.5, fontWeight: 550, cursor: removing ? 'not-allowed' : 'pointer', opacity: removing ? 0.7 : 1, flexShrink: 0 }}
+                    >
+                      {removing ? <Loader2 size={13} className="animate-spin" /> : <UnplugIcon />}
+                      Disconnect
+                    </button>
+                  )}
 
-              <button
-                onClick={handleSave}
-                disabled={saving || !apiToken.trim()}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 10, background: '#5E6AD2', border: 'none', color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: (saving || !apiToken.trim()) ? 'not-allowed' : 'pointer', opacity: (saving || !apiToken.trim()) ? 0.5 : 1, flexShrink: 0 }}
-              >
-                {saving && <Loader2 size={13} className="animate-spin" />}
-                {isConnected ? 'Update' : 'Connect'}
-              </button>
-            </div>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || !apiToken.trim()}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 10, background: '#5E6AD2', border: 'none', color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: (saving || !apiToken.trim()) ? 'not-allowed' : 'pointer', opacity: (saving || !apiToken.trim()) ? 0.5 : 1, flexShrink: 0 }}
+                  >
+                    {saving && <Loader2 size={13} className="animate-spin" />}
+                    {isConnected ? 'Update' : 'Connect'}
+                  </button>
+                </div>
 
-            {isConnected && (
-              <div style={{ marginTop: 14, fontSize: 11, color: '#3a3f4a', textAlign: 'center' }}>
-                Auto-syncs every {integration.syncEveryMinutes} min · data flows directly into the spend bar
-              </div>
+                {isConnected && (
+                  <div style={{ marginTop: 14, fontSize: 11, color: '#3a3f4a', textAlign: 'center' }}>
+                    Auto-syncs every {integration.syncEveryMinutes} min · data flows directly into the spend bar
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

@@ -7,7 +7,7 @@ import { fmtDate } from '@/lib/utils';
 import { exportToolsList } from '@/lib/excel';
 import { AddToolModal } from '@/components/tools/add-tool-modal';
 import { IntegrationModal } from '@/components/tools/integration-modal';
-import { INTEGRATION_PROVIDERS } from '@/lib/integration-providers';
+import { matchProviderByVendor } from '@/lib/integration-providers';
 
 interface KPIs {
   totalMonthlySpend: number;
@@ -20,7 +20,7 @@ interface KPIs {
 
 interface Tool {
   id: string; name: string; vendor: string; category: string;
-  paymentKind: string; monoInitials: string; monoBgColor: string;
+  paymentKind: string; billingCycle: string; monoInitials: string; monoBgColor: string;
   usedAmount: number; capAmount: number; monthlyAmount: number; // USD - the app's base currency
   barPct: number; alertThresholdPct: number; alert: boolean;
   statusSub: string; triggerEmail: string | null;
@@ -59,7 +59,7 @@ function computeRow(t: Tool, fmtAmt: (n: number) => string) {
   let statusMain = '';
   if (t.paymentKind === 'PREPAID') statusMain = `${fmtAmt(t.usedAmount)} / ${fmtAmt(t.capAmount)}`;
   else if (t.paymentKind === 'CAPSUB') statusMain = `${fmtAmt(t.monthlyAmount)} / ${fmtAmt(t.capAmount)}`;
-  else if (t.paymentKind === 'MOSUB') statusMain = `${fmtAmt(t.monthlyAmount)} / mo`;
+  else if (t.paymentKind === 'MOSUB') statusMain = `${fmtAmt(t.monthlyAmount)} / ${t.billingCycle === 'YEARLY' ? 'yr' : 'mo'}`;
 
   const statusSubColor = t.alert ? '#F85149' : t.barPct >= 75 ? '#F5A623' : t.paymentKind === 'PREPAID' && t.barPct < 70 ? '#3FB950' : '#9aa0ab';
   const barColor = t.alert ? 'linear-gradient(90deg,#C9352B,#F85149)' : t.barPct >= 75 ? 'linear-gradient(90deg,#D9881F,#F5A623)' : t.paymentKind === 'PREPAID' ? 'linear-gradient(90deg,#2EA043,#3FB950)' : 'linear-gradient(90deg,#4F5BD5,#6470e0)';
@@ -337,14 +337,12 @@ export default function DashboardPage() {
           // ones with a live integration. A manually-tracked tool (e.g. a Claude Pro
           // subscription with no API key) still means "we already have a Claude entry,"
           // so offering it again in the dropdown would just create a confusing duplicate.
+          // Uses the same matchProviderByVendor() the Configure Integration modal's
+          // provider lock uses, so the two checks can't drift out of sync again.
           connectedProviders={new Set(
             tools
-              .map((t) => INTEGRATION_PROVIDERS.find((p) => {
-                const vendor = p.vendor.toLowerCase();
-                const toolVendor = t.vendor.trim().toLowerCase();
-                return toolVendor === vendor || toolVendor.includes(vendor);
-              }))
-              .filter((p): p is typeof INTEGRATION_PROVIDERS[number] => !!p)
+              .map((t) => matchProviderByVendor(t.vendor))
+              .filter((p): p is NonNullable<typeof p> => !!p)
               .map((p) => p.value),
           )}
           onClose={() => setShowAdd(false)}

@@ -16,6 +16,9 @@ export class CreateToolDto {
   @IsOptional() @IsString()
   paymentKind?: string;
 
+  @IsOptional() @IsString()
+  billingCycle?: string;
+
   @IsOptional() @IsNumber()
   capAmount?: number;
 

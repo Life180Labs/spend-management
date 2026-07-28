@@ -21,7 +21,7 @@ const CATEGORIES = [
 
 interface ExistingTool {
   id: string; name: string; vendor: string; category: string;
-  paymentKind: string; capAmount: number; monthlyAmount: number;
+  paymentKind: string; billingCycle?: string; capAmount: number; monthlyAmount: number;
   alertThresholdPct: number; triggerEmail?: string | null;
   renewalDate?: string | null; alert?: boolean; barPct?: number;
   integration?: { provider: string; isActive: boolean } | null;
@@ -136,6 +136,7 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
   const [vendor, setVendor] = useState(tool?.vendor ?? '');
   const [category, setCategory] = useState(tool?.category ?? 'AI_LLM');
   const [paymentKind, setPaymentKind] = useState(tool?.paymentKind ?? 'PREPAID');
+  const [billingCycle, setBillingCycle] = useState(tool?.billingCycle ?? 'MONTHLY');
   const [capAmount, setCapAmount] = useState(tool?.capAmount ? String(tool.capAmount) : '');
   const [monthlyAmount, setMonthlyAmount] = useState(tool?.monthlyAmount ? String(tool.monthlyAmount) : '');
   const [alertPct, setAlertPct] = useState(String(tool?.alertThresholdPct ?? 80));
@@ -147,22 +148,32 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
   );
 
   /* ── add-mode setup ─────────────────────────────────────────────────── */
-  const [mode, setMode] = useState<'api' | 'manual'>('api');
-  const [connectProvider, setConnectProvider] = useState(
-    () => (INTEGRATION_PROVIDERS.find((p) => !connectedProviders?.has(p.value)) ?? INTEGRATION_PROVIDERS[0]).value,
-  );
-  const selectedIntegration = INTEGRATION_PROVIDERS.find((p) => p.value === connectProvider) ?? INTEGRATION_PROVIDERS[0];
+  const [mode, setMode] = useState<'api' | 'manual'>('manual');
+  // 'NONE' = no known-vendor preset picked - the common case for an arbitrary tool.
+  const [connectProvider, setConnectProvider] = useState('NONE');
+  const selectedIntegration = INTEGRATION_PROVIDERS.find((p) => p.value === connectProvider) ?? null;
+
+  function handleProviderChange(value: string) {
+    setConnectProvider(value);
+    setApiKey(''); setFetchStatus('idle'); setLimits(null); setFetchError('');
+    const p = INTEGRATION_PROVIDERS.find((x) => x.value === value);
+    if (!p) return; // NONE - leave paymentKind/mode/vendor as the user already had them
+    setPaymentKind(p.defaultPaymentKind);
+    if (p.defaultBillingCycle) setBillingCycle(p.defaultBillingCycle);
+    setMode(p.hasApi ? 'api' : 'manual');
+  }
+
   const [apiKey, setApiKey] = useState('');
   const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'ok' | 'err'>('idle');
   const [fetchError, setFetchError] = useState('');
   const [limits, setLimits] = useState<Limits | null>(null);
 
-  // Vendor is implied by the selected integration in "Connect account" mode -
-  // auto-fill and lock it there instead of asking the user to retype it.
-  const vendorLocked = !isEdit && paymentKind === 'PREPAID' && mode === 'api';
+  // Vendor is implied once a known-vendor preset is picked, regardless of payment
+  // type - auto-fill and lock it instead of asking the user to retype it.
+  const vendorLocked = !isEdit && !!selectedIntegration;
   useEffect(() => {
-    if (vendorLocked) setVendor(selectedIntegration.vendor);
-  }, [vendorLocked, connectProvider]);
+    if (selectedIntegration) setVendor(selectedIntegration.vendor);
+  }, [connectProvider]);
 
   /* ── edit-mode refresh ──────────────────────────────────────────────── */
   const [refreshing, setRefreshing] = useState(false);
@@ -179,7 +190,7 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
   /* ── fetch limits preview (add mode) ─────────────────────────────────── */
   async function fetchLimits() {
     const key = apiKey.trim();
-    if (!key) return;
+    if (!key || !selectedIntegration) return;
     setFetchStatus('loading'); setFetchError('');
     try {
       const res = await api.post<Limits | null>('/integrations/preview-limits', {
@@ -246,10 +257,10 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
     if (!name.trim()) { setError('Tool name is required'); return; }
     if (!vendor.trim()) { setError('Vendor is required'); return; }
     if (needsEmail && !emailUser.trim()) { setError('Notification email is required'); return; }
-    if (paymentKind === 'PREPAID' && mode === 'api' && selectedIntegration.hasLimits && fetchStatus !== 'ok') {
+    if (paymentKind === 'PREPAID' && mode === 'api' && selectedIntegration?.hasLimits && fetchStatus !== 'ok') {
       setError('Fetch limits from your provider before saving.'); return;
     }
-    if (paymentKind === 'PREPAID' && mode === 'api' && !selectedIntegration.hasLimits && !capAmount) {
+    if (paymentKind === 'PREPAID' && mode === 'api' && selectedIntegration && !selectedIntegration.hasLimits && !capAmount) {
       setError('Budget cap is required.'); return;
     }
     if (mode === 'manual' && paymentKind === 'PREPAID' && !capAmount) {
@@ -266,6 +277,7 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
 
       const payload: any = {
         name: name.trim(), vendor: vendor.trim(), category, paymentKind,
+        billingCycle: paymentKind === 'MOSUB' ? billingCycle : undefined,
         capAmount: cap,
         monthlyAmount: monthlyAmount ? Number(monthlyAmount) : undefined,
         alertThresholdPct: alert,
@@ -275,7 +287,7 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
 
       const result = await api.post<any>('/tools', { ...payload, departmentId: depts[0]?.id });
 
-      if (mode === 'api' && apiKey.trim()) {
+      if (mode === 'api' && selectedIntegration?.hasApi && apiKey.trim()) {
         try {
           await api.put(`/integrations/${result.id}`, {
             provider: selectedIntegration.value,
@@ -325,19 +337,19 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
           {error && <div style={S.error}>{error}</div>}
 
           {/* ══════════════════════════════════════════════════════════
-              0. INTEGRATION - pick this first, it drives Vendor/budget below
+              0. INTEGRATION - pick a known vendor first (optional), it drives
+                 Vendor/Payment type/budget below. Available for any payment type,
+                 not just Pre-paid - e.g. Namecheap defaults to a yearly Subscription.
           ══════════════════════════════════════════════════════════ */}
-          {!isEdit && paymentKind === 'PREPAID' && mode === 'api' && (
+          {!isEdit && (
             <div>
               <label style={S.label}>Integration</label>
               <select
                 value={connectProvider}
-                onChange={(e) => {
-                  setConnectProvider(e.target.value);
-                  setApiKey(''); setFetchStatus('idle'); setLimits(null); setFetchError('');
-                }}
+                onChange={(e) => handleProviderChange(e.target.value)}
                 style={S.select}
               >
+                <option value="NONE">— None (custom vendor) —</option>
                 {INTEGRATION_PROVIDERS.map((p) => {
                   const connected = connectedProviders?.has(p.value);
                   return (
@@ -403,36 +415,39 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
               2. BUDGET SETUP - second, depends on payment type
           ══════════════════════════════════════════════════════════ */}
 
-          {/* ADD mode - prepaid: show connect/manual toggle */}
+          {/* ADD mode - prepaid: show connect/manual toggle, only when the
+              selected vendor actually has an API to connect to */}
           {!isEdit && paymentKind === 'PREPAID' && (
             <>
-              <div>
-                <div style={S.sectionTitle}>Budget setup</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  {(['api', 'manual'] as const).map((m) => {
-                    const on = mode === m;
-                    return (
-                      <button key={m} type="button" onClick={() => { setMode(m); setFetchStatus('idle'); setLimits(null); }}
-                        style={{
-                          padding: '11px 14px', textAlign: 'left',
-                          backgroundColor: on ? 'rgba(94,106,210,0.13)' : '#161921',
-                          border: on ? '1.5px solid rgba(94,106,210,0.55)' : '1.5px solid rgba(255,255,255,0.07)',
-                          borderRadius: 10, cursor: 'pointer',
-                        }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: on ? '#9aa2ef' : '#7a8090', marginBottom: 3 }}>
-                          {m === 'api' ? 'Connect account' : 'Manual setup'}
-                        </div>
-                        <div style={{ fontSize: 11, color: on ? '#5b6280' : '#3d4250' }}>
-                          {m === 'api' ? 'API key or service account' : 'Enter budget & limits yourself'}
-                        </div>
-                      </button>
-                    );
-                  })}
+              {selectedIntegration?.hasApi && (
+                <div>
+                  <div style={S.sectionTitle}>Budget setup</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {(['api', 'manual'] as const).map((m) => {
+                      const on = mode === m;
+                      return (
+                        <button key={m} type="button" onClick={() => { setMode(m); setFetchStatus('idle'); setLimits(null); }}
+                          style={{
+                            padding: '11px 14px', textAlign: 'left',
+                            backgroundColor: on ? 'rgba(94,106,210,0.13)' : '#161921',
+                            border: on ? '1.5px solid rgba(94,106,210,0.55)' : '1.5px solid rgba(255,255,255,0.07)',
+                            borderRadius: 10, cursor: 'pointer',
+                          }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: on ? '#9aa2ef' : '#7a8090', marginBottom: 3 }}>
+                            {m === 'api' ? 'Connect account' : 'Manual setup'}
+                          </div>
+                          <div style={{ fontSize: 11, color: on ? '#5b6280' : '#3d4250' }}>
+                            {m === 'api' ? 'API key or service account' : 'Enter budget & limits yourself'}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Connect account panel */}
-              {mode === 'api' && (
+              {/* Connect account panel - only reachable when selectedIntegration.hasApi */}
+              {selectedIntegration?.hasApi && mode === 'api' && (
                 <div style={{ backgroundColor: '#0f1116', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '16px 16px 14px' }}>
                   <label style={S.label}>{selectedIntegration.tokenLabel}</label>
                   <input
@@ -498,8 +513,10 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
                 </div>
               )}
 
-              {/* Manual budget fields */}
-              {mode === 'manual' && (
+              {/* Manual budget fields - whenever there's no API to connect to at all
+                  (no vendor picked, or a picked vendor with no API), or the user
+                  explicitly chose Manual setup for one that does */}
+              {(!selectedIntegration?.hasApi || mode === 'manual') && (
                 <div style={{ ...S.row2 }}>
                   <div>
                     <label style={S.label}>Budget cap ($) *</label>
@@ -554,17 +571,32 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
             </div>
           )}
 
-          {/* Subscription monthly amount */}
+          {/* Subscription amount + billing cycle */}
           {paymentKind === 'MOSUB' && (
             <div>
               <div style={S.sectionTitle}>Budget</div>
-              <label style={S.label}>Monthly amount ($)</label>
-              {isEdit ? (
-                <div style={S.lockedInput}>${Number(monthlyAmount).toLocaleString('en-US')}</div>
-              ) : (
-                <input type="number" min={1} value={monthlyAmount} onChange={(e) => setMonthlyAmount(e.target.value)}
-                  placeholder="e.g. 100" style={S.input} />
-              )}
+              <div style={S.row2}>
+                <div>
+                  <label style={S.label}>Billing cycle</label>
+                  {isEdit ? (
+                    <div style={S.lockedInput}>{billingCycle === 'YEARLY' ? 'Yearly' : 'Monthly'}</div>
+                  ) : (
+                    <select value={billingCycle} onChange={(e) => setBillingCycle(e.target.value)} style={S.select}>
+                      <option value="MONTHLY">Monthly</option>
+                      <option value="YEARLY">Yearly</option>
+                    </select>
+                  )}
+                </div>
+                <div>
+                  <label style={S.label}>{billingCycle === 'YEARLY' ? 'Yearly amount ($)' : 'Monthly amount ($)'}</label>
+                  {isEdit ? (
+                    <div style={S.lockedInput}>${Number(monthlyAmount).toLocaleString('en-US')}</div>
+                  ) : (
+                    <input type="number" min={1} value={monthlyAmount} onChange={(e) => setMonthlyAmount(e.target.value)}
+                      placeholder={billingCycle === 'YEARLY' ? 'e.g. 1200' : 'e.g. 100'} style={S.input} />
+                  )}
+                </div>
+              </div>
             </div>
           )}
 

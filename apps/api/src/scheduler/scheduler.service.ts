@@ -103,9 +103,10 @@ export class SchedulerService {
   // ── Roll forward past renewal dates - daily at 9:10 AM, right after the ──
   // reminder check above so a "renews today" (daysAway = 0) email still goes
   // out with the correct date before this advances it to the next cycle.
-  // Only MOSUB/CAPSUB are recurring monthly billing cycles - PREPAID's
-  // renewalDate is a contract/license term (e.g. annual), not a monthly one,
-  // so it's left alone here.
+  // Only MOSUB/CAPSUB are recurring billing cycles - PREPAID's renewalDate is
+  // a contract/license term, not a recurring one, so it's left alone here.
+  // Cadence itself (monthly vs yearly) comes from each tool's billingCycle -
+  // this is not "the monthly cron," it just happens to run once a day.
   @Cron('10 9 * * *')
   async rollForwardRenewalDates() {
     const startOfToday = new Date();
@@ -122,7 +123,7 @@ export class SchedulerService {
     for (const tool of tools) {
       if (!tool.renewalDate) continue;
 
-      const { completedCycles, next } = this.advanceMonthlyUntilAfter(new Date(tool.renewalDate), startOfToday);
+      const { completedCycles, next } = this.advancePeriodUntilAfter(new Date(tool.renewalDate), startOfToday, tool.billingCycle);
 
       // Each renewal date we stepped past is a billing cycle that completed (the
       // subscription auto-renewed) - log it so it shows up in Reports > Billing
@@ -191,13 +192,15 @@ export class SchedulerService {
   }
 
   /**
-   * Adds whole months to `date` until it's on/after `untilAfter`, clamping the day
-   * to the last valid day of the target month (e.g. Jan 31 → Feb 28, not Mar 3).
-   * Returns every intermediate date stepped past (each one a completed billing cycle)
-   * alongside the final resulting date. Capped at 60 iterations (5 years) so a data
-   * anomaly can't loop forever.
+   * Adds one billing period (a month, or a year) to `date` at a time until it's
+   * on/after `untilAfter`, clamping the day to the last valid day of the target
+   * month (e.g. MONTHLY: Jan 31 → Feb 28, not Mar 3; YEARLY: Feb 29 on a leap
+   * year → Feb 28 the following year). Returns every intermediate date stepped
+   * past (each one a completed billing cycle) alongside the final resulting
+   * date. Capped at 60 iterations (5 years of MONTHLY, or 60 years of YEARLY -
+   * either way, comfortably beyond any real data anomaly) so it can't loop forever.
    */
-  private advanceMonthlyUntilAfter(date: Date, untilAfter: Date): { completedCycles: Date[]; next: Date } {
+  private advancePeriodUntilAfter(date: Date, untilAfter: Date, cycle: string): { completedCycles: Date[]; next: Date } {
     const day = date.getDate();
     const completedCycles: Date[] = [];
     let result = date;
@@ -205,9 +208,10 @@ export class SchedulerService {
 
     while (result < untilAfter && iterations < 60) {
       completedCycles.push(result);
-      const targetMonthIndex = result.getMonth() + 1;
-      const daysInTargetMonth = new Date(result.getFullYear(), targetMonthIndex + 1, 0).getDate();
-      result = new Date(result.getFullYear(), targetMonthIndex, Math.min(day, daysInTargetMonth));
+      const targetYear = cycle === 'YEARLY' ? result.getFullYear() + 1 : result.getFullYear();
+      const targetMonthIndex = cycle === 'YEARLY' ? result.getMonth() : result.getMonth() + 1;
+      const daysInTargetMonth = new Date(targetYear, targetMonthIndex + 1, 0).getDate();
+      result = new Date(targetYear, targetMonthIndex, Math.min(day, daysInTargetMonth));
       iterations++;
     }
 

@@ -35,6 +35,7 @@ export class ToolsService {
         vendor: dto.vendor || '',
         category: (dto.category || 'OTHER') as any,
         paymentKind: (dto.paymentKind || 'NOBUDGET') as any,
+        billingCycle: (dto.billingCycle || 'MONTHLY') as any,
         capAmount: dto.capAmount || 0,
         monthlyAmount: dto.monthlyAmount || 0,
         alertThresholdPct: dto.alertThresholdPct || 80,
@@ -102,6 +103,7 @@ export class ToolsService {
           vendor: dto.vendor,
           category: dto.category as any,
           paymentKind: dto.paymentKind as any,
+          billingCycle: dto.billingCycle as any,
           capAmount: dto.capAmount,
           monthlyAmount: dto.monthlyAmount,
           alertThresholdPct: dto.alertThresholdPct,
@@ -156,6 +158,12 @@ export class ToolsService {
     const deleted = await this.prisma.tool.update({
       where: { id },
       data: { deletedAt: new Date(), isActive: false },
+    });
+    // Deactivate any live integration too - otherwise the 15-min sync cron keeps
+    // polling the deleted tool's provider indefinitely (real bug found in testing).
+    await this.prisma.toolIntegration.updateMany({
+      where: { toolId: id },
+      data: { isActive: false },
     });
     await this.audit.log(orgId, actorId, 'tool.deleted', 'Tool', id, tool, null);
     return deleted;

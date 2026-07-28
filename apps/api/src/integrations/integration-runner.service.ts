@@ -20,7 +20,7 @@ export class IntegrationRunnerService {
   /** Run all active integrations. Called by the scheduler cron. */
   async runAll() {
     const integrations = await this.prisma.toolIntegration.findMany({
-      where: { isActive: true },
+      where: { isActive: true, tool: { deletedAt: null } },
     });
     await Promise.allSettled(integrations.map((i) => this.runOne(i)));
   }

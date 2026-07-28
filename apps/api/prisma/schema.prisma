@@ -40,6 +40,13 @@ enum PaymentKind {
   NOBUDGET   // uncapped - triggers "needs budget" alert
 }
 
+// How often a subscription (MOSUB/CAPSUB) renews - orthogonal to PaymentKind,
+// which answers "how is this tool budgeted," not "how often does it renew."
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
 enum ToolCategory {
   AI_LLM
   CLOUD_INFRA
@@ -254,6 +261,7 @@ model Tool {
   vendor            String       @default("")
   category          ToolCategory @default(OTHER)
   paymentKind       PaymentKind  @default(NOBUDGET)
+  billingCycle      BillingCycle @default(MONTHLY) // renewal cadence for MOSUB/CAPSUB tools
   monthlyAmount     Float        @default(0) // USD
   usedAmount        Float        @default(0) // USD
   capAmount         Float        @default(0) // USD
