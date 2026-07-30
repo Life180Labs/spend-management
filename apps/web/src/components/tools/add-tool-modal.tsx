@@ -185,7 +185,11 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
   const [loading, setLoading] = useState(false);
   const [depts, setDepts] = useState<{ id: string }[]>([]);
 
-  useEffect(() => { api.get<any[]>('/departments').then(setDepts).catch(() => { }); }, []);
+  useEffect(() => {
+    api.get<any[]>('/departments').then(setDepts).catch((err) => {
+      setError(err.message || 'Could not load department info. Try closing and reopening this dialog.');
+    });
+  }, []);
 
   /* ── fetch limits preview (add mode) ─────────────────────────────────── */
   async function fetchLimits() {
@@ -256,6 +260,7 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
 
     if (!name.trim()) { setError('Tool name is required'); return; }
     if (!vendor.trim()) { setError('Vendor is required'); return; }
+    if (!depts[0]?.id) { setError('Still loading department info - please wait a moment and try again.'); return; }
     if (needsEmail && !emailUser.trim()) { setError('Notification email is required'); return; }
     if (paymentKind === 'PREPAID' && mode === 'api' && selectedIntegration?.hasLimits && fetchStatus !== 'ok') {
       setError('Fetch limits from your provider before saving.'); return;
@@ -643,12 +648,13 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
         {/* Footer - outside the form, buttons use form= attribute */}
         <div style={S.footer}>
           <button type="button" onClick={onClose} style={S.btnSecondary}>Cancel</button>
-          <button type="submit" form="tool-form-inner" disabled={loading}
-            style={{ ...S.btnPrimary, opacity: loading ? 0.7 : 1 }}>
+          <button type="submit" form="tool-form-inner" disabled={loading || (!isEdit && !depts[0]?.id)}
+            style={{ ...S.btnPrimary, opacity: (loading || (!isEdit && !depts[0]?.id)) ? 0.7 : 1 }}>
             {loading ? 'Saving…'
-              : isEdit ? 'Save changes'
-                : mode === 'api' ? 'Add & connect'
-                  : 'Add tool'}
+              : !isEdit && !depts[0]?.id ? 'Loading…'
+                : isEdit ? 'Save changes'
+                  : mode === 'api' ? 'Add & connect'
+                    : 'Add tool'}
           </button>
         </div>
 

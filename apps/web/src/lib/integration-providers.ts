@@ -60,6 +60,19 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderMeta[] = [
     defaultPaymentKind: 'MOSUB',
     defaultBillingCycle: 'YEARLY',
   },
+  {
+    value: 'GOOGLE_WORKSPACE',
+    label: 'Google Workspace',
+    vendor: 'Google Workspace',
+    hasApi: false,
+    tokenKey: '',
+    tokenLabel: '',
+    placeholder: '',
+    helpText: '',
+    hasLimits: false,
+    defaultPaymentKind: 'MOSUB',
+    defaultBillingCycle: 'MONTHLY',
+  },
 ];
 
 /**
