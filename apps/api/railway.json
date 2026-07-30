@@ -1,0 +1,10 @@
+{
+  "build": {
+    "buildCommand": "pnpm install --frozen-lockfile && pnpm --filter api build",
+    "watchPatterns": ["apps/api/**"]
+  },
+  "deploy": {
+    "startCommand": "node apps/api/dist/src/main",
+    "preDeployCommand": "pnpm --filter api exec prisma migrate deploy"
+  }
+}

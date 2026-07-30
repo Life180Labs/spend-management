@@ -1,0 +1,9 @@
+{
+  "build": {
+    "buildCommand": "pnpm install --frozen-lockfile && pnpm --filter web build",
+    "watchPatterns": ["apps/web/**"]
+  },
+  "deploy": {
+    "startCommand": "pnpm --filter web start"
+  }
+}
