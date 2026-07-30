@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MailService, ThresholdAlertItem } from '../mail/mail.service';
 import { IntegrationRunnerService, PROVIDERS } from '../integrations/integration-runner.service';
 import { BillingService } from '../billing/billing.service';
+import { advancePeriodUntilAfter } from './renewal-cycle.util';
 
 @Injectable()
 export class SchedulerService {
@@ -135,7 +136,7 @@ export class SchedulerService {
     for (const tool of tools) {
       if (!tool.renewalDate) continue;
 
-      const { completedCycles, next } = this.advancePeriodUntilAfter(new Date(tool.renewalDate), startOfToday, tool.billingCycle);
+      const { completedCycles, next } = advancePeriodUntilAfter(new Date(tool.renewalDate), startOfToday, tool.billingCycle);
 
       // Each renewal date we stepped past is a billing cycle that completed (the
       // subscription auto-renewed) - log it so it shows up in Reports > Billing
@@ -201,32 +202,5 @@ export class SchedulerService {
         this.logger.error(`Failed to log completed-month billing for ${tool.name} (${monthKey}): ${err.message}`);
       }
     }
-  }
-
-  /**
-   * Adds one billing period (a month, or a year) to `date` at a time until it's
-   * on/after `untilAfter`, clamping the day to the last valid day of the target
-   * month (e.g. MONTHLY: Jan 31 → Feb 28, not Mar 3; YEARLY: Feb 29 on a leap
-   * year → Feb 28 the following year). Returns every intermediate date stepped
-   * past (each one a completed billing cycle) alongside the final resulting
-   * date. Capped at 60 iterations (5 years of MONTHLY, or 60 years of YEARLY -
-   * either way, comfortably beyond any real data anomaly) so it can't loop forever.
-   */
-  private advancePeriodUntilAfter(date: Date, untilAfter: Date, cycle: string): { completedCycles: Date[]; next: Date } {
-    const day = date.getDate();
-    const completedCycles: Date[] = [];
-    let result = date;
-    let iterations = 0;
-
-    while (result < untilAfter && iterations < 60) {
-      completedCycles.push(result);
-      const targetYear = cycle === 'YEARLY' ? result.getFullYear() + 1 : result.getFullYear();
-      const targetMonthIndex = cycle === 'YEARLY' ? result.getMonth() : result.getMonth() + 1;
-      const daysInTargetMonth = new Date(targetYear, targetMonthIndex + 1, 0).getDate();
-      result = new Date(targetYear, targetMonthIndex, Math.min(day, daysInTargetMonth));
-      iterations++;
-    }
-
-    return { completedCycles, next: result };
   }
 }

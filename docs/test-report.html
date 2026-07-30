@@ -1,0 +1,723 @@
+<title>Spend Management — Unit Test Report</title>
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --surface: #ffffff;
+    --surface-sunken: #efeee9;
+    --border: #dedad2;
+    --ink: #23241f;
+    --ink-dim: #6b6a63;
+    --ink-faint: #9b9a92;
+    --accent: #5E6AD2;
+    --accent-ink: #ffffff;
+    --good: #1a7f4e;
+    --good-bg: #e3f3ea;
+    --good-border: #b8ddc7;
+    --mono-tint: #eceaf9;
+    --shadow: 0 1px 2px rgba(35,36,31,0.04), 0 8px 24px rgba(35,36,31,0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14151a;
+      --surface: #1b1c22;
+      --surface-sunken: #101116;
+      --border: #2c2d35;
+      --ink: #e8e7e2;
+      --ink-dim: #9a9a9a;
+      --ink-faint: #6b6b72;
+      --accent: #8891e8;
+      --accent-ink: #14151a;
+      --good: #4fd188;
+      --good-bg: #16241d;
+      --good-border: #244a35;
+      --mono-tint: #20212e;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14151a; --surface: #1b1c22; --surface-sunken: #101116; --border: #2c2d35;
+    --ink: #e8e7e2; --ink-dim: #9a9a9a; --ink-faint: #6b6b72;
+    --accent: #8891e8; --accent-ink: #14151a;
+    --good: #4fd188; --good-bg: #16241d; --good-border: #244a35;
+    --mono-tint: #20212e;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f5f2; --surface: #ffffff; --surface-sunken: #efeee9; --border: #dedad2;
+    --ink: #23241f; --ink-dim: #6b6a63; --ink-faint: #9b9a92;
+    --accent: #5E6AD2; --accent-ink: #ffffff;
+    --good: #1a7f4e; --good-bg: #e3f3ea; --good-border: #b8ddc7;
+    --mono-tint: #eceaf9;
+    --shadow: 0 1px 2px rgba(35,36,31,0.04), 0 8px 24px rgba(35,36,31,0.05);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+  body {
+    padding: 40px 20px 80px;
+  }
+
+  .page {
+    max-width: 880px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 34px;
+  }
+
+  /* ── Masthead ─────────────────────────────────────────── */
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 12px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h1 {
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    font-size: clamp(28px, 4vw, 38px);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+    color: var(--ink);
+  }
+  .subtitle {
+    font-size: 14.5px;
+    color: var(--ink-dim);
+    max-width: 62ch;
+    line-height: 1.55;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-top: 4px;
+  }
+  .meta-row span b { color: var(--ink-dim); font-weight: 600; }
+
+  /* ── Summary strip ────────────────────────────────────── */
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .stat {
+    background: var(--surface);
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .stat .n {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .stat .n.pass { color: var(--good); }
+  .stat .l {
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  @media (max-width: 640px) {
+    .summary { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ── Section headers ──────────────────────────────────── */
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+  }
+  .section-head h2 {
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--ink);
+  }
+  .section-head .tally {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  .section-note {
+    font-size: 13.5px;
+    color: var(--ink-dim);
+    line-height: 1.6;
+    max-width: 68ch;
+  }
+
+  /* ── Suite cards ───────────────────────────────────────── */
+  .suites {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  details.suite {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  details.suite[open] summary {
+    border-bottom: 1px solid var(--border);
+  }
+  summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 13px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary .chev {
+    font-size: 10px;
+    color: var(--ink-faint);
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+    width: 10px;
+  }
+  details[open] summary .chev { transform: rotate(90deg); }
+  @media (prefers-reduced-motion: reduce) {
+    summary .chev { transition: none; }
+  }
+  summary .badge {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--good);
+    background: var(--good-bg);
+    border: 1px solid var(--good-border);
+    border-radius: 20px;
+    padding: 2px 9px;
+    white-space: nowrap;
+  }
+  summary .path {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--ink);
+    font-weight: 600;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  summary .count {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  .suite-purpose {
+    padding: 10px 16px 2px;
+    font-size: 13px;
+    color: var(--ink-dim);
+    line-height: 1.55;
+  }
+  .cases {
+    list-style: none;
+    margin: 0;
+    padding: 6px 16px 14px;
+    display: flex;
+    flex-direction: column;
+  }
+  .cases li {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    padding: 5px 0;
+    font-size: 13px;
+    line-height: 1.5;
+    border-top: 1px solid var(--surface-sunken);
+  }
+  .cases li:first-child { border-top: none; }
+  .cases li .tick {
+    color: var(--good);
+    font-weight: 700;
+    flex-shrink: 0;
+    font-size: 12px;
+    width: 12px;
+  }
+  .cases li .desc { color: var(--ink); }
+
+  /* ── Coverage strip ───────────────────────────────────── */
+  .cov-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .cov-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+  }
+  .cov-table th, .cov-table td {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 12.5px;
+    border-bottom: 1px solid var(--surface-sunken);
+    white-space: nowrap;
+  }
+  .cov-table th {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    font-weight: 600;
+    background: var(--surface-sunken);
+  }
+  .cov-table td.file {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .cov-table td.num {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-dim);
+  }
+  .cov-table tr:last-child td { border-bottom: none; }
+  .barcell { display: flex; align-items: center; gap: 8px; }
+  .bar {
+    width: 74px; height: 6px; border-radius: 3px;
+    background: var(--surface-sunken);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .bar > span {
+    display: block; height: 100%;
+    background: var(--good);
+    border-radius: 3px;
+  }
+
+  /* ── Callout ──────────────────────────────────────────── */
+  .callout {
+    background: var(--mono-tint);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+  .callout b { color: var(--accent); }
+  .callout code {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 12px;
+    background: var(--surface-sunken);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  /* ── Out of scope list ────────────────────────────────── */
+  .scope-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .scope-list span {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 12px;
+    color: var(--ink-dim);
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+
+  footer {
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    padding-top: 10px;
+  }
+</style>
+
+<div class="page">
+
+  <div class="masthead">
+    <div class="eyebrow">Test Report — apps/api &amp; apps/web</div>
+    <h1>Unit test suite: all green</h1>
+    <div class="subtitle">
+      Jest unit tests for the tool-integration, billing, and scheduling logic built up this
+      session, plus a first pass of frontend component tests. Every spec exercises the real
+      service or component code with mocked dependencies — nothing here is a reimplementation
+      of the logic under test.
+    </div>
+    <div class="meta-row">
+      <span><b>Run:</b> 2026-07-30</span>
+      <span><b>Runner:</b> Jest 29 + ts-jest / next/jest</span>
+      <span><b>Scope:</b> apps/api, apps/web</span>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="stat"><div class="n">9</div><div class="l">Suites</div></div>
+    <div class="stat"><div class="n">65</div><div class="l">Tests</div></div>
+    <div class="stat"><div class="n pass">65</div><div class="l">Passing</div></div>
+    <div class="stat"><div class="n pass">0</div><div class="l">Failing</div></div>
+  </div>
+
+  <!-- ══════════════════════ API SUITE ══════════════════════ -->
+  <div style="display:flex; flex-direction:column; gap:14px;">
+    <div class="section-head">
+      <h2>apps/api — 7 suites</h2>
+      <span class="tally">51 tests · 51 passing</span>
+    </div>
+    <div class="section-note">
+      Covers the logic behind this session's real bug fixes: yearly-subscription
+      pro-ration, the soft-delete sync leak, vendor-matching drift, and consolidated
+      threshold-alert emails. Pure date/math utilities are extracted and tested in
+      isolation; services are tested with a mocked Prisma/Mail/provider layer.
+    </div>
+
+    <div class="suites">
+
+      <details class="suite" open>
+        <summary>
+          <span class="chev">▶</span>
+          <span class="path">scheduler/renewal-cycle.util.spec.ts</span>
+          <span class="count">8 tests</span>
+          <span class="badge">PASS</span>
+        </summary>
+        <div class="suite-purpose">
+          Extracted <code>advancePeriodUntilAfter</code> — the pure date-math that steps a
+          renewal date forward by whole months or years.
+        </div>
+        <ul class="cases">
+          <li><span class="tick">✓</span><span class="desc">does not advance a date already on/after the target</span></li>
+          <li><span class="tick">✓</span><span class="desc">advances a MONTHLY date by one month when one cycle behind</span></li>
+          <li><span class="tick">✓</span><span class="desc">advances a YEARLY date by one year when one cycle behind</span></li>
+          <li><span class="tick">✓</span><span class="desc">clamps MONTHLY day-of-month for a shorter target month (Jan 31 → Feb 28)</span></li>
+          <li><span class="tick">✓</span><span class="desc">clamps a leap-day YEARLY date to Feb 28 the following non-leap year</span></li>
+          <li><span class="tick">✓</span><span class="desc">steps through multiple completed MONTHLY cycles when far behind</span></li>
+          <li><span class="tick">✓</span><span class="desc">steps through multiple completed YEARLY cycles when far behind</span></li>
+          <li><span class="tick">✓</span><span class="desc">caps at 60 iterations to guarantee termination on anomalous input</span></li>
+        </ul>
+      </details>
+
+      <details class="suite">
+        <summary>
+          <span class="chev">▶</span>
+          <span class="path">tools/spend-math.util.spec.ts</span>
+          <span class="count">6 tests</span>
+          <span class="badge">PASS</span>
+        </summary>
+        <div class="suite-purpose">
+          <code>monthlyEquivalentSpend</code> — the shared pro-ration helper that fixed the
+          Namecheap yearly-subscription-counted-as-monthly bug.
+        </div>
+        <ul class="cases">
+          <li><span class="tick">✓</span><span class="desc">PREPAID uses live usedAmount regardless of monthlyAmount</span></li>
+          <li><span class="tick">✓</span><span class="desc">CAPSUB uses live usedAmount regardless of monthlyAmount</span></li>
+          <li><span class="tick">✓</span><span class="desc">MOSUB + MONTHLY passes monthlyAmount through unchanged</span></li>
+          <li><span class="tick">✓</span><span class="desc">MOSUB + YEARLY divides monthlyAmount by 12</span></li>
+          <li><span class="tick">✓</span><span class="desc">missing/null billingCycle is treated as MONTHLY</span></li>
+          <li><span class="tick">✓</span><span class="desc">falsy usedAmount/monthlyAmount resolve to 0, not NaN</span></li>
+        </ul>
+      </details>
+
+      <details class="suite">
+        <summary>
+          <span class="chev">▶</span>
+          <span class="path">billing/billing.service.spec.ts</span>
+          <span class="count">6 tests</span>
+          <span class="badge">PASS</span>
+        </summary>
+        <div class="suite-purpose">
+          <code>recordCompletedCycle</code> idempotency and <code>monthSummary</code>'s
+          live-total pro-ration.
+        </div>
+        <ul class="cases">
+          <li><span class="tick">✓</span><span class="desc">returns null without creating a record when the tool doesn't exist</span></li>
+          <li><span class="tick">✓</span><span class="desc">creates a PAID record with the correct snapshot and monthLabel</span></li>
+          <li><span class="tick">✓</span><span class="desc">swallows a P2002 unique-constraint violation and returns null (idempotent re-runs)</span></li>
+          <li><span class="tick">✓</span><span class="desc">re-throws non-P2002 errors</span></li>
+          <li><span class="tick">✓</span><span class="desc">pro-rates a YEARLY MOSUB tool by /12 in the current-month live total</span></li>
+          <li><span class="tick">✓</span><span class="desc">falls back to the raw groupBy summary when there's no live spend</span></li>
+        </ul>
+      </details>
+
+      <details class="suite">
+        <summary>
+          <span class="chev">▶</span>
+          <span class="path">integrations/integration-runner.service.spec.ts</span>
+          <span class="count">7 tests</span>
+          <span class="badge">PASS</span>
+        </summary>
+        <div class="suite-purpose">
+          Generic <code>PROVIDERS[provider]</code> dispatch and the soft-delete sync-leak fix.
+        </div>
+        <ul class="cases">
+          <li><span class="tick">✓</span><span class="desc">runAll only queries active integrations on non-deleted tools</span></li>
+          <li><span class="tick">✓</span><span class="desc">runAll runs every returned integration</span></li>
+          <li><span class="tick">✓</span><span class="desc">runOne dispatches by provider key, not a hardcoded vendor check</span></li>
+          <li><span class="tick">✓</span><span class="desc">logs a warning and no-ops for an unregistered provider key</span></li>
+          <li><span class="tick">✓</span><span class="desc">uses the tool's own cap/threshold when the provider has no fetchLimitsUSD</span></li>
+          <li><span class="tick">✓</span><span class="desc">refreshes cap/threshold from provider-reported limits when available</span></li>
+          <li><span class="tick">✓</span><span class="desc">records lastError on the integration instead of throwing on failure</span></li>
+        </ul>
+      </details>
+
+      <details class="suite">
+        <summary>
+          <span class="chev">▶</span>
+          <span class="path">integrations/integrations.service.spec.ts</span>
+          <span class="count">8 tests</span>
+          <span class="badge">PASS</span>
+        </summary>
+        <div class="suite-purpose">
+          Confirms fetchLimits/getUsageHistory dispatch generically instead of the old
+          hardcoded <code>if (provider !== 'RAILWAY')</code> checks.
+        </div>
+        <ul class="cases">
+          <li><span class="tick">✓</span><span class="desc">fetchLimits throws NotFoundException with no integration configured</span></li>
+          <li><span class="tick">✓</span><span class="desc">fetchLimits returns null when the dispatched provider has no fetchLimitsUSD</span></li>
+          <li><span class="tick">✓</span><span class="desc">fetchLimits derives alertThresholdPct from the soft/hard limit ratio</span></li>
+          <li><span class="tick">✓</span><span class="desc">getUsageHistory throws when the provider has no fetchHistoricalSpendUSD</span></li>
+          <li><span class="tick">✓</span><span class="desc">getUsageHistory returns the provider's result when supported</span></li>
+          <li><span class="tick">✓</span><span class="desc">get() masks long string config values (never exposes raw secrets)</span></li>
+          <li><span class="tick">✓</span><span class="desc">get() returns null when no integration exists for the tool</span></li>
+          <li><span class="tick">✓</span><span class="desc">throws NotFoundException for a tool outside the org / soft-deleted</span></li>
+        </ul>
+      </details>
+
+      <details class="suite">
+        <summary>
+          <span class="chev">▶</span>
+          <span class="path">tools/tools.service.spec.ts</span>
+          <span class="count">7 tests</span>
+          <span class="badge">PASS</span>
+        </summary>
+        <div class="suite-purpose">
+          <code>softDelete</code>'s integration-deactivation fix (the 15-min sync cron
+          used to keep polling a deleted tool).
+        </div>
+        <ul class="cases">
+          <li><span class="tick">✓</span><span class="desc">translates a P2002 violation into a ConflictException on create</span></li>
+          <li><span class="tick">✓</span><span class="desc">defaults billingCycle to MONTHLY when not provided</span></li>
+          <li><span class="tick">✓</span><span class="desc">persists an explicit YEARLY billingCycle</span></li>
+          <li><span class="tick">✓</span><span class="desc">softDelete deactivates BOTH the tool and its integration</span></li>
+          <li><span class="tick">✓</span><span class="desc">throws NotFoundException for a tool outside the org</span></li>
+          <li><span class="tick">✓</span><span class="desc">flags alert=true only once barPct reaches the threshold, for budgeted kinds</span></li>
+          <li><span class="tick">✓</span><span class="desc">never flags alert for NOBUDGET tools regardless of barPct</span></li>
+        </ul>
+      </details>
+
+      <details class="suite">
+        <summary>
+          <span class="chev">▶</span>
+          <span class="path">scheduler/scheduler.service.spec.ts</span>
+          <span class="count">9 tests</span>
+          <span class="badge">PASS</span>
+        </summary>
+        <div class="suite-purpose">
+          Threshold-alert grouping (one email per recipient, not per tool) and the
+          renewal rollover / completed-month billing crons.
+        </div>
+        <ul class="cases">
+          <li><span class="tick">✓</span><span class="desc">sends exactly ONE consolidated email for two breaching tools sharing a recipient</span></li>
+          <li><span class="tick">✓</span><span class="desc">sends separate emails to different recipients</span></li>
+          <li><span class="tick">✓</span><span class="desc">skips tools below their alert threshold</span></li>
+          <li><span class="tick">✓</span><span class="desc">suppresses a repeat send within 24 hours for the same tool</span></li>
+          <li><span class="tick">✓</span><span class="desc">records a completed cycle for each stepped-past renewal and advances the date</span></li>
+          <li><span class="tick">✓</span><span class="desc">scopes the rollover query to MOSUB/CAPSUB with a past renewal date only</span></li>
+          <li><span class="tick">✓</span><span class="desc">logs completed-month billing via fetchHistoricalSpendUSD for a capable, active integration</span></li>
+          <li><span class="tick">✓</span><span class="desc">skips tools whose integration is inactive</span></li>
+          <li><span class="tick">✓</span><span class="desc">skips tools whose provider has no fetchHistoricalSpendUSD (e.g. Claude)</span></li>
+        </ul>
+      </details>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════ COVERAGE ══════════════════════ -->
+  <div style="display:flex; flex-direction:column; gap:14px;">
+    <div class="section-head">
+      <h2>Coverage — apps/api</h2>
+      <span class="tally">files touched by this session's fixes</span>
+    </div>
+    <div class="cov-wrap">
+      <table class="cov-table">
+        <thead>
+          <tr><th>File</th><th>Stmts</th><th>Branch</th><th>Lines</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="file">scheduler/renewal-cycle.util.ts</td>
+            <td class="num"><div class="barcell"><div class="bar"><span style="width:100%"></span></div>100%</div></td>
+            <td class="num">100%</td>
+            <td class="num">100%</td>
+          </tr>
+          <tr>
+            <td class="file">tools/spend-math.util.ts</td>
+            <td class="num"><div class="barcell"><div class="bar"><span style="width:100%"></span></div>100%</div></td>
+            <td class="num">100%</td>
+            <td class="num">100%</td>
+          </tr>
+          <tr>
+            <td class="file">integrations/integration-runner.service.ts</td>
+            <td class="num"><div class="barcell"><div class="bar"><span style="width:97.5%"></span></div>97.5%</div></td>
+            <td class="num">91.3%</td>
+            <td class="num">97.3%</td>
+          </tr>
+          <tr>
+            <td class="file">scheduler/scheduler.service.ts</td>
+            <td class="num"><div class="barcell"><div class="bar"><span style="width:78.6%"></span></div>78.6%</div></td>
+            <td class="num">61.5%</td>
+            <td class="num">80.5%</td>
+          </tr>
+          <tr>
+            <td class="file">integrations/integrations.service.ts</td>
+            <td class="num"><div class="barcell"><div class="bar"><span style="width:67.2%"></span></div>67.2%</div></td>
+            <td class="num">40.9%</td>
+            <td class="num">70.6%</td>
+          </tr>
+          <tr>
+            <td class="file">billing/billing.service.ts</td>
+            <td class="num"><div class="barcell"><div class="bar"><span style="width:62.1%"></span></div>62.1%</div></td>
+            <td class="num">45.5%</td>
+            <td class="num">66.0%</td>
+          </tr>
+          <tr>
+            <td class="file">tools/tools.service.ts</td>
+            <td class="num"><div class="barcell"><div class="bar"><span style="width:53.7%"></span></div>53.7%</div></td>
+            <td class="num">56.9%</td>
+            <td class="num">56.1%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="section-note">
+      Controllers, DTOs, auth, budgets, reports, and spend-requests are 0% — none were
+      touched by this session's bug fixes, so they were left out of scope rather than
+      padded with shallow tests.
+    </div>
+  </div>
+
+  <!-- ══════════════════════ WEB SUITE ══════════════════════ -->
+  <div style="display:flex; flex-direction:column; gap:14px;">
+    <div class="section-head">
+      <h2>apps/web — 2 suites</h2>
+      <span class="tally">14 tests · 14 passing</span>
+    </div>
+    <div class="section-note">
+      Newly scaffolded this pass: Jest + <code>@testing-library/react</code> via
+      <code>next/jest</code> (no config previously existed — the package.json
+      <code>test</code> script was a stub).
+    </div>
+
+    <div class="suites">
+
+      <details class="suite" open>
+        <summary>
+          <span class="chev">▶</span>
+          <span class="path">lib/integration-providers.spec.ts</span>
+          <span class="count">9 tests</span>
+          <span class="badge">PASS</span>
+        </summary>
+        <div class="suite-purpose">
+          <code>matchProviderByVendor</code>'s substring tolerance and each preset's
+          metadata flags.
+        </div>
+        <ul class="cases">
+          <li><span class="tick">✓</span><span class="desc">returns undefined for empty/null/undefined/whitespace vendor</span></li>
+          <li><span class="tick">✓</span><span class="desc">matches an exact vendor name case-insensitively</span></li>
+          <li><span class="tick">✓</span><span class="desc">matches "Railway.com" to Railway via substring tolerance (the drift bug this fixed)</span></li>
+          <li><span class="tick">✓</span><span class="desc">matches Namecheap and Google Workspace like any API vendor</span></li>
+          <li><span class="tick">✓</span><span class="desc">returns undefined for an unmatched vendor</span></li>
+          <li><span class="tick">✓</span><span class="desc">every provider has a unique dropdown value</span></li>
+          <li><span class="tick">✓</span><span class="desc">Namecheap and Google Workspace are hasApi: false</span></li>
+          <li><span class="tick">✓</span><span class="desc">Railway and Claude are hasApi: true</span></li>
+          <li><span class="tick">✓</span><span class="desc">Namecheap defaults to YEARLY, Google Workspace to MONTHLY</span></li>
+        </ul>
+      </details>
+
+      <details class="suite" open>
+        <summary>
+          <span class="chev">▶</span>
+          <span class="path">components/tools/add-tool-modal.spec.tsx</span>
+          <span class="count">5 tests</span>
+          <span class="badge">PASS</span>
+        </summary>
+        <div class="suite-purpose">
+          The departmentId race-condition fix, preset auto-fill, and dropdown dedup —
+          rendered and interacted with via Testing Library, not just unit logic.
+        </div>
+        <ul class="cases">
+          <li><span class="tick">✓</span><span class="desc">submit stays disabled + shows "Loading…" until /departments resolves</span></li>
+          <li><span class="tick">✓</span><span class="desc">a failed /departments fetch surfaces a real error, not silent failure</span></li>
+          <li><span class="tick">✓</span><span class="desc">picking Namecheap locks the vendor field and defaults to a yearly cycle</span></li>
+          <li><span class="tick">✓</span><span class="desc">an already-connected provider shows disabled in the dropdown</span></li>
+          <li><span class="tick">✓</span><span class="desc">required-field validation blocks submit before hitting the API</span></li>
+        </ul>
+      </details>
+
+    </div>
+  </div>
+
+  <div class="callout">
+    <b>One assumption caught mid-pass:</b> a scheduler test initially assumed a renewal
+    date one year in the past would trigger a single rollover cycle. Since this
+    environment's clock reads <code>2026-07-30</code>, a <code>2025-07-15</code> renewal
+    is actually <b>two</b> completed yearly cycles behind — the test was corrected to
+    assert both <code>recordCompletedCycle</code> calls, which is a stronger exercise of
+    the multi-cycle catch-up path than the original assumption.
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:10px;">
+    <div class="section-head" style="border-bottom:none; padding-bottom:0;">
+      <h2 style="font-size:16px;">Not covered in this pass</h2>
+    </div>
+    <div class="scope-list">
+      <span>controllers</span>
+      <span>DTOs</span>
+      <span>auth / JWT / Google strategy</span>
+      <span>budgets</span>
+      <span>reports</span>
+      <span>spend-requests</span>
+      <span>notifications</span>
+      <span>mail.service.ts (template only, rendered manually earlier)</span>
+    </div>
+  </div>
+
+  <footer>9 suites · 65 tests · 0 failures — apps/api (Jest + ts-jest) · apps/web (Jest + next/jest + Testing Library)</footer>
+
+</div>
