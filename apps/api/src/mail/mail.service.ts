@@ -2,6 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 
+export interface ThresholdAlertItem {
+  toolName: string;
+  vendor: string;
+  barPct: number;
+  thresholdPct: number;
+  capAmount: number | null;
+}
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
@@ -14,25 +22,28 @@ export class MailService {
     this.from = config.get<string>('MAIL_FROM', 'Spend Management <onboarding@resend.dev>');
   }
 
-  async sendThresholdAlert(
-    to: string,
-    toolName: string,
-    vendor: string,
-    barPct: number,
-    thresholdPct: number,
-    capAmount: number | null,
-  ) {
-    const barColor = barPct >= 90 ? '#F85149' : '#F5A623';
+  /**
+   * One recipient can have several tools breach their threshold in the same check
+   * cycle - this sends ONE consolidated email listing all of them, rather than one
+   * email per tool. Callers are responsible for grouping by recipient first (see
+   * SchedulerService.checkThresholdAlerts).
+   */
+  async sendThresholdAlert(to: string, alerts: ThresholdAlertItem[]) {
+    if (alerts.length === 0) return;
+
+    const subject = alerts.length === 1
+      ? `⚠️ Budget Alert: ${alerts[0].toolName} has reached ${alerts[0].barPct}% of its cap`
+      : `⚠️ Budget Alert: ${alerts.length} tools have reached their alert threshold`;
 
     const { error } = await this.resend.emails.send({
       from: this.from,
       to,
-      subject: `⚠️ Budget Alert: ${toolName} has reached ${barPct}% of its cap`,
-      html: this.thresholdHtml(toolName, vendor, barPct, thresholdPct, capAmount, barColor, to),
+      subject,
+      html: this.thresholdHtml(alerts, to),
     });
 
     if (error) throw new Error(error.message);
-    this.logger.log(`Threshold alert sent → ${to} (${toolName} at ${barPct}%)`);
+    this.logger.log(`Threshold alert sent → ${to} (${alerts.map((a) => `${a.toolName} ${a.barPct}%`).join(', ')})`);
   }
 
   async sendRenewalReminder(
@@ -60,10 +71,35 @@ export class MailService {
 
   // ── Email templates ───────────────────────────────────────────────
 
-  private thresholdHtml(
-    toolName: string, vendor: string, barPct: number, thresholdPct: number,
-    capAmount: number | null, barColor: string, to: string,
-  ) {
+  private thresholdHtml(alerts: ThresholdAlertItem[], to: string) {
+    const intro = alerts.length === 1
+      ? `<strong style="color:#F2F3F5">${alerts[0].toolName}</strong> by ${alerts[0].vendor} has breached its alert threshold.`
+      : `<strong style="color:#F2F3F5">${alerts.length} tools</strong> have breached their alert threshold.`;
+
+    const cards = alerts.map((a) => {
+      const barColor = a.barPct >= 90 ? '#F85149' : '#F5A623';
+      return `
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0B0E;border:1px solid #1A1D24;border-radius:12px;margin-bottom:14px">
+            <tr><td style="padding:18px 20px">
+              <div style="font-size:13px;font-weight:600;color:#F2F3F5;margin-bottom:12px">${a.toolName} <span style="font-weight:400;color:#6b707b">· ${a.vendor}</span></div>
+              <table width="100%" cellpadding="0" cellspacing="0"><tr>
+                <td>
+                  <div style="font-size:11px;color:#6b707b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Current Usage</div>
+                  <div style="font-size:26px;font-weight:700;color:${barColor};letter-spacing:-.02em">${a.barPct}%</div>
+                </td>
+                <td align="right">
+                  <div style="font-size:11px;color:#6b707b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Alert Threshold</div>
+                  <div style="font-size:26px;font-weight:700;color:#cfd3da;letter-spacing:-.02em">${a.thresholdPct}%</div>
+                </td>
+              </tr></table>
+              <div style="height:8px;border-radius:999px;background:#1B1E26;margin-top:14px;overflow:hidden">
+                <div style="height:100%;width:${Math.min(100, a.barPct)}%;border-radius:999px;background:${barColor}"></div>
+              </div>
+              ${a.capAmount ? `<div style="font-size:11px;color:#6b707b;margin-top:8px">Budget cap: $${a.capAmount.toLocaleString('en-US')}</div>` : ''}
+            </td></tr>
+          </table>`;
+    }).join('');
+
     return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -75,42 +111,23 @@ export class MailService {
         <tr><td style="background:#111318;padding:20px 28px;border-bottom:1px solid #1E212A">
           <table width="100%" cellpadding="0" cellspacing="0"><tr>
             <td><span style="font-size:14px;font-weight:700;color:#F2F3F5">Spend Management</span>&nbsp;<span style="font-size:11px;color:#5E6AD2">· Life180 Labs</span></td>
-            <td align="right"><span style="display:inline-block;padding:4px 10px;border-radius:20px;background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);font-size:11px;font-weight:600;color:#F85149">⚠ Budget Alert</span></td>
+            <td align="right"><span style="display:inline-block;padding:4px 10px;border-radius:20px;background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);font-size:11px;font-weight:600;color:#F85149">⚠ Budget Alert${alerts.length > 1 ? ` · ${alerts.length}` : ''}</span></td>
           </tr></table>
         </td></tr>
 
         <tr><td style="padding:28px">
-          <p style="margin:0 0 20px;font-size:15px;color:#9aa0ab">
-            <strong style="color:#F2F3F5">${toolName}</strong> by ${vendor} has breached its alert threshold.
-          </p>
+          <p style="margin:0 0 20px;font-size:15px;color:#9aa0ab">${intro}</p>
 
-          <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0B0E;border:1px solid #1A1D24;border-radius:12px;margin-bottom:20px">
-            <tr><td style="padding:18px 20px">
-              <table width="100%" cellpadding="0" cellspacing="0"><tr>
-                <td>
-                  <div style="font-size:11px;color:#6b707b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Current Usage</div>
-                  <div style="font-size:28px;font-weight:700;color:${barColor};letter-spacing:-.02em">${barPct}%</div>
-                </td>
-                <td align="right">
-                  <div style="font-size:11px;color:#6b707b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Alert Threshold</div>
-                  <div style="font-size:28px;font-weight:700;color:#cfd3da;letter-spacing:-.02em">${thresholdPct}%</div>
-                </td>
-              </tr></table>
-              <div style="height:8px;border-radius:999px;background:#1B1E26;margin-top:14px;overflow:hidden">
-                <div style="height:100%;width:${Math.min(100, barPct)}%;border-radius:999px;background:${barColor}"></div>
-              </div>
-              ${capAmount ? `<div style="font-size:11px;color:#6b707b;margin-top:8px">Budget cap: $${capAmount.toLocaleString('en-US')}</div>` : ''}
-            </td></tr>
-          </table>
+          ${cards}
 
-          <p style="margin:0 0 24px;font-size:13px;color:#767b86;line-height:1.6">
+          <p style="margin:20px 0 24px;font-size:13px;color:#767b86;line-height:1.6">
             Review usage and consider topping up or adjusting the budget cap before it is exhausted.
           </p>
           <a href="http://localhost:3000/dashboard" style="display:inline-block;padding:11px 22px;border-radius:9px;background:#5E6AD2;color:#fff;font-size:13px;font-weight:600;text-decoration:none">View Dashboard →</a>
         </td></tr>
 
         <tr><td style="padding:16px 28px;border-top:1px solid #1A1D24;font-size:11px;color:#4a4f59">
-          ${to} is the alert contact for ${toolName} · Spend Management, Life180 Labs
+          ${to} is the alert contact for ${alerts.length === 1 ? alerts[0].toolName : `${alerts.length} tools`} · Spend Management, Life180 Labs
         </td></tr>
 
       </table>

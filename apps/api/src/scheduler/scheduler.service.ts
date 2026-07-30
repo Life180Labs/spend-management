@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
-import { MailService } from '../mail/mail.service';
+import { MailService, ThresholdAlertItem } from '../mail/mail.service';
 import { IntegrationRunnerService, PROVIDERS } from '../integrations/integration-runner.service';
 import { BillingService } from '../billing/billing.service';
 
@@ -25,7 +25,10 @@ export class SchedulerService {
     await this.integrationRunner.runAll();
   }
 
-  // ── Threshold breach check - every 5 minutes ──────────────────────
+  // ── Threshold breach check - every 5 minutes. Multiple tools can breach for ──
+  // the same recipient in one cycle (e.g. two PREPAID tools sharing an alert
+  // email) - group by recipient first so each person gets ONE consolidated
+  // email listing every breaching tool, not one email per tool.
   @Cron('*/5 * * * *')
   async checkThresholdAlerts() {
     const tools = await this.prisma.tool.findMany({
@@ -36,6 +39,8 @@ export class SchedulerService {
       },
     });
 
+    const byRecipient = new Map<string, { tool: typeof tools[number]; item: ThresholdAlertItem }[]>();
+
     for (const tool of tools) {
       if (!tool.triggerEmail) continue;
       if (tool.barPct < tool.alertThresholdPct) continue;
@@ -44,18 +49,25 @@ export class SchedulerService {
       const lastSent = this.thresholdAlertSentAt.get(tool.id) ?? 0;
       if (Date.now() - lastSent < 24 * 60 * 60 * 1000) continue;
 
+      const item: ThresholdAlertItem = {
+        toolName: tool.name,
+        vendor: tool.vendor,
+        barPct: tool.barPct,
+        thresholdPct: tool.alertThresholdPct,
+        capAmount: tool.capAmount,
+      };
+      const group = byRecipient.get(tool.triggerEmail) ?? [];
+      group.push({ tool, item });
+      byRecipient.set(tool.triggerEmail, group);
+    }
+
+    for (const [email, group] of byRecipient) {
       try {
-        await this.mail.sendThresholdAlert(
-          tool.triggerEmail,
-          tool.name,
-          tool.vendor,
-          tool.barPct,
-          tool.alertThresholdPct,
-          tool.capAmount,
-        );
-        this.thresholdAlertSentAt.set(tool.id, Date.now());
+        await this.mail.sendThresholdAlert(email, group.map((g) => g.item));
+        const sentAt = Date.now();
+        for (const g of group) this.thresholdAlertSentAt.set(g.tool.id, sentAt);
       } catch (err: any) {
-        this.logger.error(`Threshold alert failed for ${tool.name}: ${err.message}`);
+        this.logger.error(`Threshold alert failed for ${email} (${group.map((g) => g.tool.name).join(', ')}): ${err.message}`);
       }
     }
   }
