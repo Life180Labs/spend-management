@@ -80,7 +80,6 @@ export default function ReportsPage() {
     { label: 'Total Monthly Spend', value: fmtAmt(totalSpend), sub: 'this period' },
     { label: 'Tracked Tools', value: String(toolCount), sub: 'with billing records' },
     { label: 'Categories', value: String(categories.length), sub: 'active categories' },
-    { label: 'Avg / Tool', value: toolCount ? fmtAmt(Math.round(totalSpend / toolCount)) : `${currency === 'USD' ? '$' : '₹'}0`, sub: 'per month' },
   ];
 
   return (
@@ -111,7 +110,7 @@ export default function ReportsPage() {
       {tab === 'spend' && (
         <>
           {/* Report stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
             {reportStats.map((s) => (
               <div key={s.label} style={{ background: '#101218', border: '1px solid #1E212A', borderRadius: 13, padding: '16px 18px' }}>
                 <div style={{ fontSize: 11.5, color: '#878c96', marginBottom: 9 }}>{s.label}</div>

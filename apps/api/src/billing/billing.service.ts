@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { monthlyEquivalentSpend } from '../tools/spend-math.util';
 
 @Injectable()
 export class BillingService {
@@ -115,14 +116,13 @@ export class BillingService {
     const currentMonth = new Date().toISOString().slice(0, 7);
     const tools = await this.prisma.tool.findMany({
       where: { orgId, deletedAt: null, paymentKind: { not: 'NOBUDGET' } },
-      select: { paymentKind: true, usedAmount: true, monthlyAmount: true },
+      select: { paymentKind: true, billingCycle: true, usedAmount: true, monthlyAmount: true },
     });
 
     let liveTotal = 0;
     let liveCount = 0;
     for (const t of tools) {
-      const usageBased = t.paymentKind === 'PREPAID' || t.paymentKind === 'CAPSUB';
-      const amount = (usageBased ? t.usedAmount : t.monthlyAmount) || 0;
+      const amount = monthlyEquivalentSpend(t);
       if (amount > 0) {
         liveTotal += amount;
         liveCount++;

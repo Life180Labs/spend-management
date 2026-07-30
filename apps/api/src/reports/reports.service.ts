@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { monthlyEquivalentSpend } from '../tools/spend-math.util';
 
 function currentMonthKey(): string {
   return new Date().toISOString().slice(0, 7); // YYYY-MM
@@ -40,14 +41,13 @@ export class ReportsService {
       where: { orgId, deletedAt: null, paymentKind: { not: 'NOBUDGET' } },
       select: {
         id: true, name: true, category: true, monoInitials: true,
-        monoBgColor: true, paymentKind: true, usedAmount: true, monthlyAmount: true,
+        monoBgColor: true, paymentKind: true, billingCycle: true, usedAmount: true, monthlyAmount: true,
       },
     });
 
     return tools
       .map((t): SpendRow => {
-        const usageBased = t.paymentKind === 'PREPAID' || t.paymentKind === 'CAPSUB';
-        const amount = (usageBased ? t.usedAmount : t.monthlyAmount) || 0;
+        const amount = monthlyEquivalentSpend(t);
         return {
           id: `live-${t.id}`,
           toolId: t.id,
@@ -249,15 +249,15 @@ export class ReportsService {
     });
     const historicalSpend = billingSum._sum.amount || 0;
 
-    // Get real-time tool spend (subscription tools use monthlyAmount, prepaid use usedAmount)
+    // Get real-time tool spend (subscription tools use monthlyAmount pro-rated by
+    // billingCycle, prepaid use usedAmount - see monthlyEquivalentSpend)
     const tools = await this.prisma.tool.findMany({
       where: { orgId, deletedAt: null },
-      select: { paymentKind: true, monthlyAmount: true, usedAmount: true },
+      select: { paymentKind: true, billingCycle: true, monthlyAmount: true, usedAmount: true },
     });
     const realtimeSpend = tools.reduce((sum, t) => {
       if (t.paymentKind === 'NOBUDGET') return sum;
-      const amount = (t.paymentKind === 'PREPAID' || t.paymentKind === 'CAPSUB') ? t.usedAmount : t.monthlyAmount;
-      return sum + (amount || 0);
+      return sum + monthlyEquivalentSpend(t);
     }, 0);
 
     const totalThisMonth = historicalSpend + realtimeSpend;

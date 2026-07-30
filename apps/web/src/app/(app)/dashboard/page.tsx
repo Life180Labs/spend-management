@@ -197,6 +197,9 @@ export default function DashboardPage() {
               </span>
             </div>
             <div style={{ fontSize: 28, fontWeight: 680, color: '#F2F3F5', letterSpacing: '-.02em', lineHeight: 1 }}>{makeFmt(currency, fxRate)(kpis.totalMonthlySpend)}</div>
+            <div style={{ fontSize: 12, color: '#6b707b', marginTop: 11 }} title="A yearly subscription's cost is divided by 12 before being added to this total, so it reflects its true monthly rate.">
+              yearly subscriptions pro-rated
+            </div>
           </div>
 
           {/* Card 2: Tools Needing Budget Setup */}
