@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
-import { MailService, ThresholdAlertItem } from '../mail/mail.service';
+import { MailService, ThresholdAlertItem, UpcomingRenewalItem } from '../mail/mail.service';
 import { IntegrationRunnerService, PROVIDERS } from '../integrations/integration-runner.service';
 import { BillingService } from '../billing/billing.service';
 import { advancePeriodUntilAfter } from './renewal-cycle.util';
@@ -62,9 +62,47 @@ export class SchedulerService {
       byRecipient.set(tool.triggerEmail, group);
     }
 
+    if (byRecipient.size === 0) return;
+
+    // Also surface each recipient's upcoming renewals (same 5-day lookahead as
+    // checkRenewalReminders below) in the same email, so a budget-breach alert
+    // doubles as a heads-up for a renewal the recipient might otherwise only
+    // see in a separate reminder email later.
+    const now = new Date();
+    const in5Days = new Date();
+    in5Days.setDate(now.getDate() + 5);
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const renewingTools = await this.prisma.tool.findMany({
+      where: {
+        deletedAt: null,
+        renewalDate: { lte: in5Days, gte: startOfToday },
+        triggerEmail: { in: Array.from(byRecipient.keys()) },
+      },
+    });
+
+    const renewalsByRecipient = new Map<string, UpcomingRenewalItem[]>();
+    for (const t of renewingTools) {
+      if (!t.triggerEmail || !t.renewalDate) continue;
+      const daysAway = Math.max(
+        0,
+        Math.ceil((new Date(t.renewalDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+      );
+      const item: UpcomingRenewalItem = {
+        toolName: t.name,
+        vendor: t.vendor,
+        renewalDate: new Date(t.renewalDate),
+        daysAway,
+        monthlyAmount: t.monthlyAmount,
+      };
+      const list = renewalsByRecipient.get(t.triggerEmail) ?? [];
+      list.push(item);
+      renewalsByRecipient.set(t.triggerEmail, list);
+    }
+
     for (const [email, group] of byRecipient) {
       try {
-        await this.mail.sendThresholdAlert(email, group.map((g) => g.item));
+        await this.mail.sendThresholdAlert(email, group.map((g) => g.item), renewalsByRecipient.get(email) ?? []);
         const sentAt = Date.now();
         for (const g of group) this.thresholdAlertSentAt.set(g.tool.id, sentAt);
       } catch (err: any) {

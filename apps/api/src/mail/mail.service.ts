@@ -10,6 +10,14 @@ export interface ThresholdAlertItem {
   capAmount: number | null;
 }
 
+export interface UpcomingRenewalItem {
+  toolName: string;
+  vendor: string;
+  renewalDate: Date;
+  daysAway: number;
+  monthlyAmount: number | null;
+}
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
@@ -29,8 +37,13 @@ export class MailService {
    * cycle - this sends ONE consolidated email listing all of them, rather than one
    * email per tool. Callers are responsible for grouping by recipient first (see
    * SchedulerService.checkThresholdAlerts).
+   *
+   * Also surfaces that same recipient's upcoming renewals (if any, within the
+   * scheduler's lookahead window) as extra context in the same email - so
+   * whoever acts on a budget breach also sees a renewal they might otherwise
+   * only learn about from a separate reminder email later.
    */
-  async sendThresholdAlert(to: string, alerts: ThresholdAlertItem[]) {
+  async sendThresholdAlert(to: string, alerts: ThresholdAlertItem[], upcomingRenewals: UpcomingRenewalItem[] = []) {
     if (alerts.length === 0) return;
 
     const subject = alerts.length === 1
@@ -41,7 +54,7 @@ export class MailService {
       from: this.from,
       to,
       subject,
-      html: this.thresholdHtml(alerts, to),
+      html: this.thresholdHtml(alerts, upcomingRenewals, to),
     });
 
     if (error) throw new Error(error.message);
@@ -73,10 +86,34 @@ export class MailService {
 
   // ── Email templates ───────────────────────────────────────────────
 
-  private thresholdHtml(alerts: ThresholdAlertItem[], to: string) {
+  private thresholdHtml(alerts: ThresholdAlertItem[], upcomingRenewals: UpcomingRenewalItem[], to: string) {
     const intro = alerts.length === 1
       ? `<strong style="color:#F2F3F5">${alerts[0].toolName}</strong> by ${alerts[0].vendor} has breached its alert threshold.`
       : `<strong style="color:#F2F3F5">${alerts.length} tools</strong> have breached their alert threshold.`;
+
+    const renewalsSection = upcomingRenewals.length === 0 ? '' : `
+          <div style="margin:22px 0 4px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b707b">
+            Upcoming Renewal${upcomingRenewals.length > 1 ? 's' : ''}
+          </div>
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0B0E;border:1px solid rgba(245,166,35,0.25);border-radius:12px;margin-top:10px;margin-bottom:14px">
+            <tr><td style="padding:6px 20px">
+              ${upcomingRenewals.map((r, i) => {
+                const urgencyColor = r.daysAway === 0 ? '#F85149' : '#F5A623';
+                const urgencyLabel = r.daysAway === 0 ? 'today' : `in ${r.daysAway} day${r.daysAway === 1 ? '' : 's'}`;
+                const dateStr = r.renewalDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                const borderTop = i === 0 ? '' : 'border-top:1px solid #1A1D24;';
+                return `
+              <table width="100%" cellpadding="0" cellspacing="0" style="${borderTop}padding:${i === 0 ? '10' : '12'}px 0 12px">
+                <tr><td>
+                  <div style="font-size:13px;font-weight:600;color:#F2F3F5">${r.toolName} <span style="font-weight:400;color:#6b707b">· ${r.vendor}</span></div>
+                  <div style="font-size:12px;color:#767b86;margin-top:3px">
+                    Renews <span style="color:${urgencyColor};font-weight:600">${urgencyLabel}</span> · ${dateStr}${r.monthlyAmount ? ` · $${r.monthlyAmount.toLocaleString('en-US')}` : ''}
+                  </div>
+                </td></tr>
+              </table>`;
+              }).join('')}
+            </td></tr>
+          </table>`;
 
     const cards = alerts.map((a) => {
       const barColor = a.barPct >= 90 ? '#F85149' : '#F5A623';
@@ -121,6 +158,7 @@ export class MailService {
           <p style="margin:0 0 20px;font-size:15px;color:#9aa0ab">${intro}</p>
 
           ${cards}
+          ${renewalsSection}
 
           <p style="margin:20px 0 24px;font-size:13px;color:#767b86;line-height:1.6">
             Review usage and consider topping up or adjusting the budget cap before it is exhausted.
