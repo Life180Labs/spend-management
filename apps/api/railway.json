@@ -1,6 +1,6 @@
 {
   "build": {
-    "buildCommand": "pnpm install --frozen-lockfile && pnpm --filter api build",
+    "buildCommand": "pnpm install --frozen-lockfile && pnpm --filter api exec prisma generate && pnpm --filter api build",
     "watchPatterns": ["apps/api/**"]
   },
   "deploy": {
