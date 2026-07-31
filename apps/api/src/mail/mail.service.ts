@@ -15,11 +15,13 @@ export class MailService {
   private readonly logger = new Logger(MailService.name);
   private resend: Resend;
   private from: string;
+  private frontendUrl: string;
 
   constructor(private config: ConfigService) {
     this.resend = new Resend(config.get<string>('RESEND_API_KEY'));
     // Use verified domain sender if configured, else Resend's sandbox address
     this.from = config.get<string>('MAIL_FROM', 'Spend Management <onboarding@resend.dev>');
+    this.frontendUrl = config.get<string>('FRONTEND_URL', 'http://localhost:3000');
   }
 
   /**
@@ -123,7 +125,7 @@ export class MailService {
           <p style="margin:20px 0 24px;font-size:13px;color:#767b86;line-height:1.6">
             Review usage and consider topping up or adjusting the budget cap before it is exhausted.
           </p>
-          <a href="http://localhost:3000/dashboard" style="display:inline-block;padding:11px 22px;border-radius:9px;background:#5E6AD2;color:#fff;font-size:13px;font-weight:600;text-decoration:none">View Dashboard →</a>
+          <a href="${this.frontendUrl}/dashboard" style="display:inline-block;padding:11px 22px;border-radius:9px;background:#5E6AD2;color:#fff;font-size:13px;font-weight:600;text-decoration:none">View Dashboard →</a>
         </td></tr>
 
         <tr><td style="padding:16px 28px;border-top:1px solid #1A1D24;font-size:11px;color:#4a4f59">
@@ -184,7 +186,7 @@ export class MailService {
           <p style="margin:0 0 24px;font-size:13px;color:#767b86;line-height:1.6">
             Make sure your payment method is up to date and the subscription is still needed before the renewal date.
           </p>
-          <a href="http://localhost:3000/dashboard" style="display:inline-block;padding:11px 22px;border-radius:9px;background:#5E6AD2;color:#fff;font-size:13px;font-weight:600;text-decoration:none">View Dashboard →</a>
+          <a href="${this.frontendUrl}/dashboard" style="display:inline-block;padding:11px 22px;border-radius:9px;background:#5E6AD2;color:#fff;font-size:13px;font-weight:600;text-decoration:none">View Dashboard →</a>
         </td></tr>
 
         <tr><td style="padding:16px 28px;border-top:1px solid #1A1D24;font-size:11px;color:#4a4f59">
