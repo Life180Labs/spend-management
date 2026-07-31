@@ -5,6 +5,8 @@
   },
   "deploy": {
     "startCommand": "node apps/api/dist/src/main",
-    "preDeployCommand": "pnpm --filter api exec prisma migrate deploy"
+    "preDeployCommand": "pnpm --filter api exec prisma migrate deploy",
+    "healthcheckPath": "/api/v1/health",
+    "healthcheckTimeout": 30
   }
 }

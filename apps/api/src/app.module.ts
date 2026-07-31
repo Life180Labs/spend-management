@@ -16,6 +16,7 @@ import { ReportsModule } from './reports/reports.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditModule } from './audit/audit.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
     AuditModule,
     SchedulerModule,
     IntegrationsModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
