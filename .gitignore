@@ -60,3 +60,12 @@ apps/api/src/generated/
 # ── Docker local volumes ──────────────────────────────────────────────
 postgres-data/
 redis-data/
+
+# ── Railway CLI (local project link + auth state) ──────────────────────
+.railway/
+
+# ── TLS / certs (should never be committed) ─────────────────────────────
+*.pem
+*.key
+*.pfx
+*.p12
