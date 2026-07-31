@@ -5,7 +5,7 @@
   },
   "deploy": {
     "startCommand": "node apps/api/dist/src/main",
-    "preDeployCommand": "n=0; until pnpm --filter api exec prisma migrate deploy; do n=$((n+1)); if [ $n -ge 6 ]; then echo 'Migration failed after 6 attempts - giving up.'; exit 1; fi; echo \"DB not ready yet (attempt $n/6), retrying in 5s...\"; sleep 5; done",
+    "preDeployCommand": "n=0; until pnpm --filter api exec prisma migrate deploy; do n=$((n+1)); if [ $n -ge 6 ]; then echo 'Migration failed after 6 attempts - giving up.'; exit 1; fi; echo \"DB not ready yet (attempt $n/6), retrying in 5s...\"; sleep 5; done && pnpm --filter api exec ts-node prisma/seed.ts",
     "healthcheckPath": "/api/v1/health",
     "healthcheckTimeout": 30
   }
