@@ -73,6 +73,20 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderMeta[] = [
     defaultPaymentKind: 'MOSUB',
     defaultBillingCycle: 'MONTHLY',
   },
+  {
+    value: 'HEYGEN',
+    label: 'HeyGen',
+    vendor: 'HeyGen',
+    hasApi: true,
+    tokenKey: 'apiKey',
+    tokenLabel: 'API Key',
+    placeholder: 'Paste your HeyGen API key',
+    helpText: 'app.heygen.com → Settings → API Keys',
+    // No spend-limit endpoint (same as Claude) - budget cap is always entered
+    // manually, even in "Connect account" mode.
+    hasLimits: false,
+    defaultPaymentKind: 'PREPAID',
+  },
 ];
 
 /**

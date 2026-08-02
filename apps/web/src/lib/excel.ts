@@ -62,6 +62,7 @@ export function exportSpendAnalysis(
 // ─── Billing History Export ───────────────────────────────────────────────────
 
 interface BillingRow {
+  id: string;
   tool: { name: string; category: string } | null;
   monthLabel: string;
   amount: number;
@@ -73,6 +74,11 @@ export function exportBillingHistory(
   monthFilter: string,
   currency: 'INR' | 'USD',
   fxRate: number,
+  // The selected filter's human-readable range (e.g. "Jul – Sep 2026" for This
+  // Quarter) - shown in every row's Period column instead of that record's own
+  // billing month, matching the on-screen Billing History table. Falls back to
+  // each row's own monthLabel if not supplied, so existing callers don't break.
+  periodRangeLabel?: string,
 ) {
   const fmt = (n: number) =>
     currency === 'USD'
@@ -83,9 +89,14 @@ export function exportBillingHistory(
   const data = rows.map((r) => ({
     Tool: r.tool?.name || 'Deleted tool',
     Category: CAT_LABELS[r.tool?.category || ''] || r.tool?.category || '-',
-    Period: r.monthLabel,
+    Period: periodRangeLabel ?? r.monthLabel,
     [`Amount (${sym})`]: fmt(r.amount),
-    Status: r.status === 'PAID' ? 'Paid' : 'Pending',
+    // Same status labeling as the Billing History table on-screen: a live
+    // synthesized current-month row (id starts with "live-") reads "In
+    // progress," not the more final-sounding "Pending" a closed, unpaid
+    // historical month gets - otherwise the export disagrees with what the
+    // user just saw on screen for the exact same rows.
+    Status: r.status === 'PAID' ? 'Paid' : r.id.startsWith('live-') ? 'In progress' : 'Pending',
   }));
 
   const ws = sheet(data);
@@ -105,6 +116,7 @@ interface ToolRow {
   usedAmount: number; capAmount: number; monthlyAmount: number;
   barPct: number; alertThresholdPct: number; alert: boolean;
   triggerEmail: string | null; renewalDate: string | null; daysUntilRenewal: number | null;
+  integration?: { lastSyncRemainingBalanceUSD: number | null } | null;
 }
 
 const PAY_LABELS: Record<string, string> = {
@@ -127,14 +139,20 @@ export function exportToolsList(
     const used = t.paymentKind === 'PREPAID' || t.paymentKind === 'CAPSUB'
       ? t.usedAmount : t.monthlyAmount;
     const cap = t.capAmount || 0;
+    // "Wallet" mirrors the Dashboard's display-only relabeling - still PaymentKind
+    // PREPAID underneath, just a wallet-style integration (e.g. HeyGen) that reports
+    // a remaining balance instead of climbing toward a manually-set cap.
+    const remainingBalance = t.integration?.lastSyncRemainingBalanceUSD;
+    const isWallet = remainingBalance != null;
     return {
       'Tool Name': t.name,
       Vendor: t.vendor,
       Category: CAT_LABELS[t.category] || t.category,
-      'Payment Type': PAY_LABELS[t.paymentKind] || t.paymentKind,
+      'Payment Type': isWallet ? 'Wallet' : (PAY_LABELS[t.paymentKind] || t.paymentKind),
       [`Used (${sym})`]: fmt(used),
       [`Budget Cap (${sym})`]: cap > 0 ? fmt(cap) : 'Uncapped',
       '% Used': t.paymentKind !== 'NOBUDGET' ? `${t.barPct}%` : '-',
+      [`Remaining Balance (${sym})`]: isWallet ? fmt(remainingBalance!) : '-',
       'Alert Threshold': t.paymentKind !== 'NOBUDGET' ? `${t.alertThresholdPct}%` : '-',
       'Alert Active': t.alert ? 'Yes' : 'No',
       'Notify Email': t.triggerEmail || '-',

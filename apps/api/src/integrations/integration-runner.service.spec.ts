@@ -9,6 +9,13 @@ jest.mock('./providers/claude.provider', () => ({
     fetchSpendUSD: jest.fn(),
   })),
 }));
+jest.mock('./providers/heygen.provider', () => ({
+  // Mirrors the real HeyGenProvider's shape - only fetchSpendUSD, which
+  // (unlike Railway/Claude) can return providerState.
+  HeyGenProvider: jest.fn().mockImplementation(() => ({
+    fetchSpendUSD: jest.fn(),
+  })),
+}));
 
 import { IntegrationRunnerService, PROVIDERS } from './integration-runner.service';
 
@@ -17,6 +24,7 @@ describe('IntegrationRunnerService', () => {
   let service: IntegrationRunnerService;
   const railway = PROVIDERS.RAILWAY as any;
   const claude = PROVIDERS.CLAUDE as any;
+  const heygen = PROVIDERS.HEYGEN as any;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -103,6 +111,63 @@ describe('IntegrationRunnerService', () => {
       expect(prisma.toolIntegration.update).toHaveBeenCalledWith({
         where: { id: 'i2' },
         data: { lastError: 'API key revoked' },
+      });
+    });
+
+    it('merges providerState into config when a provider returns it (HeyGen-style stateful providers)', async () => {
+      heygen.fetchSpendUSD.mockResolvedValue({
+        amountUSD: 25,
+        providerState: { heygenLastBalance: 35, heygenPeriodSpend: 25, heygenPeriodMonthKey: '2026-08' },
+      });
+      prisma.tool.findUnique.mockResolvedValue({ capAmount: 50, alertThresholdPct: 80 });
+
+      await service.runOne({ id: 'i3', toolId: 't3', provider: 'HEYGEN', config: { apiKey: 'k1', heygenLastBalance: 50 } });
+
+      expect(prisma.toolIntegration.update).toHaveBeenCalledWith({
+        where: { id: 'i3' },
+        data: expect.objectContaining({
+          config: { apiKey: 'k1', heygenLastBalance: 35, heygenPeriodSpend: 25, heygenPeriodMonthKey: '2026-08' },
+        }),
+      });
+    });
+
+    it('leaves config completely untouched (undefined) for providers that never return providerState (Railway, Claude)', async () => {
+      railway.fetchSpendUSD.mockResolvedValue({ amountUSD: 9, breakdown: [], byProject: [] });
+      prisma.tool.findUnique.mockResolvedValue({ capAmount: 20, alertThresholdPct: 80 });
+
+      await service.runOne({ id: 'i1', toolId: 't1', provider: 'RAILWAY', config: { apiToken: 'tok' } });
+
+      expect(prisma.toolIntegration.update).toHaveBeenCalledWith({
+        where: { id: 'i1' },
+        data: expect.objectContaining({ config: undefined }),
+      });
+    });
+
+    it('persists lastSyncRemainingBalanceUSD when a provider reports one (HeyGen)', async () => {
+      heygen.fetchSpendUSD.mockResolvedValue({
+        amountUSD: 25,
+        remainingBalanceUSD: 35,
+        providerState: { heygenLastBalance: 35, heygenPeriodSpend: 25, heygenPeriodMonthKey: '2026-08' },
+      });
+      prisma.tool.findUnique.mockResolvedValue({ capAmount: 50, alertThresholdPct: 80 });
+
+      await service.runOne({ id: 'i3', toolId: 't3', provider: 'HEYGEN', config: { apiKey: 'k1' } });
+
+      expect(prisma.toolIntegration.update).toHaveBeenCalledWith({
+        where: { id: 'i3' },
+        data: expect.objectContaining({ lastSyncRemainingBalanceUSD: 35 }),
+      });
+    });
+
+    it('explicitly persists lastSyncRemainingBalanceUSD: null (not left untouched) for providers that never report a balance (Railway, Claude)', async () => {
+      railway.fetchSpendUSD.mockResolvedValue({ amountUSD: 9, breakdown: [], byProject: [] });
+      prisma.tool.findUnique.mockResolvedValue({ capAmount: 20, alertThresholdPct: 80 });
+
+      await service.runOne({ id: 'i1', toolId: 't1', provider: 'RAILWAY', config: {} });
+
+      expect(prisma.toolIntegration.update).toHaveBeenCalledWith({
+        where: { id: 'i1' },
+        data: expect.objectContaining({ lastSyncRemainingBalanceUSD: null }),
       });
     });
   });

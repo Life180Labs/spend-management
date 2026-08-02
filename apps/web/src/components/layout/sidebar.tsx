@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { fmt } from '@/lib/utils';
 
-interface KPIMin { alertCount: number; totalMonthlySpend: number; toolCount: number; }
+interface KPIMin { alertCount: number; totalMonthlySpend: number; toolCount: number; renewalCount: number; noBudgetCount: number; }
 
 const NAV = [
   {
@@ -99,9 +99,17 @@ export function Sidebar() {
             >
               <span style={{ display: 'flex', color: active ? '#9aa2ef' : 'currentColor' }}>{icon}</span>
               {label}
-              {label === 'Alerts' && kpis && kpis.alertCount > 0 && (
-                <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 650, color: '#F85149', background: 'rgba(248,81,73,.13)', padding: '1px 7px', borderRadius: 20 }}>{kpis.alertCount}</span>
-              )}
+              {(() => {
+                if (label !== 'Alerts' || !kpis) return null;
+                // Matches the 3 sections the Alerts page itself surfaces: threshold
+                // breaches, missing budgets, and upcoming renewals (within the same
+                // 5-day lookahead dashboardKpis already uses) - not just breaches.
+                const attentionCount = kpis.alertCount + kpis.renewalCount + kpis.noBudgetCount;
+                if (attentionCount === 0) return null;
+                return (
+                  <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 650, color: '#F85149', background: 'rgba(248,81,73,.13)', padding: '1px 7px', borderRadius: 20 }}>{attentionCount}</span>
+                );
+              })()}
             </Link>
           );
         })}

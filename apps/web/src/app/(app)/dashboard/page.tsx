@@ -26,7 +26,7 @@ interface Tool {
   statusSub: string; triggerEmail: string | null;
   renewalDate: string | null; daysUntilRenewal: number | null;
   isActive: boolean;
-  integration: { provider: string; lastSyncAt: string | null; lastSyncAmountUSD: number | null; isActive: boolean; lastError: string | null } | null;
+  integration: { provider: string; lastSyncAt: string | null; lastSyncAmountUSD: number | null; lastSyncRemainingBalanceUSD: number | null; isActive: boolean; lastError: string | null } | null;
 }
 
 const CAT_LABELS: Record<string, string> = {
@@ -41,8 +41,7 @@ const TABS = [
   { key: 'NOBUDGET', label: 'Needs Budget' },
 ];
 
-const GRID = 'minmax(200px,2.1fr) 1.15fr 1fr 1.95fr 1.7fr 1.15fr 60px';
-const HEADERS = ['Tool', 'Category', 'Payment', 'Budget Status', 'Alert / Renewal Trigger', 'Next Renewal', 'Actions'];
+const GRID = 'minmax(200px,2fr) 1.05fr 0.95fr 1.75fr 1.15fr 1.6fr 1.05fr 60px';
 
 type SpendPeriod = 'this_month' | 'last_month' | 'this_quarter' | 'year_to_date';
 const PERIOD_OPTIONS: { key: SpendPeriod; label: string }[] = [
@@ -51,6 +50,25 @@ const PERIOD_OPTIONS: { key: SpendPeriod; label: string }[] = [
   { key: 'this_quarter', label: 'This quarter' },
   { key: 'year_to_date', label: 'Year to date' },
 ];
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// A visible date range for Quarter/YTD, so the card doesn't just say "this
+// quarter" with no indication of which months that actually spans - without
+// this, "This Quarter" can look identical to "This Month" whenever there's no
+// data yet for the quarter's earlier months, which reads as broken even
+// though the underlying total is correct (see Reports > Billing History,
+// same root confusion, same fix applied there).
+function periodRangeSuffix(period: SpendPeriod): string {
+  const now = new Date();
+  if (period === 'this_quarter') {
+    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+    const quarterEndMonth = quarterStartMonth + 2;
+    return ` (${MONTH_NAMES[quarterStartMonth]}–${MONTH_NAMES[quarterEndMonth]} ${now.getFullYear()})`;
+  }
+  if (period === 'year_to_date') return ` (Jan–${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()})`;
+  return '';
+}
 
 function makeFmt(currency: 'INR' | 'USD', fxRate: number) {
   // Every stored amount is USD-native - the app's base currency. USD display
@@ -90,9 +108,19 @@ function computeRow(t: Tool, fmtAmt: (n: number) => string) {
     else { renewMain = 'Top-up rule'; renewSub = `at ${t.alertThresholdPct}% used`; renewColor = '#9aa0ab'; }
   }
 
-  const payBg = t.paymentKind === 'PREPAID' ? 'rgba(94,106,210,0.14)' : 'rgba(255,255,255,0.05)';
-  const payColor = t.paymentKind === 'PREPAID' ? '#9aa2ef' : '#9aa0ab';
-  const payLabel = t.paymentKind === 'PREPAID' ? 'Pre-paid' : t.paymentKind === 'NOBUDGET' ? 'No budget' : 'Subscription';
+  // "Wallet" is a display-only relabeling, not a new PaymentKind - it's still PREPAID
+  // underneath (see docs/heygen-remaining-balance-loop-prompt.md for why a real new
+  // enum value was rejected: 20+ unguarded paymentKind branches across this file and
+  // add-tool-modal.tsx). Triggered purely by "does this integration report a balance."
+  const isWallet = t.integration?.lastSyncRemainingBalanceUSD != null;
+  // Teal (#0EA5A8) is already an established accent in this app (usage-history's
+  // Memory metric) - reused here rather than inventing a new hue, and deliberately
+  // distinct from the indigo Pre-paid badge and the amber/red low-balance warning
+  // that can appear on the same row.
+  const payBg = isWallet ? 'rgba(14,165,168,0.14)' : t.paymentKind === 'PREPAID' ? 'rgba(94,106,210,0.14)' : 'rgba(255,255,255,0.05)';
+  const payColor = isWallet ? '#4fc9cb' : t.paymentKind === 'PREPAID' ? '#9aa2ef' : '#9aa0ab';
+  const payLabel = isWallet ? 'Wallet'
+    : t.paymentKind === 'PREPAID' ? 'Pre-paid' : t.paymentKind === 'NOBUDGET' ? 'No budget' : 'Subscription';
 
   return { statusMain, statusSubColor, barColor, renewMain, renewSub, renewColor, renewUrgent, payBg, payColor, payLabel };
 }
@@ -114,6 +142,7 @@ export default function DashboardPage() {
   const [fxRate, setFxRate] = useState(94.4);
   const [spendPeriod, setSpendPeriod] = useState<SpendPeriod>('this_month');
   const [periodSpendTotal, setPeriodSpendTotal] = useState<number | null>(null);
+  const [periodSpendByTool, setPeriodSpendByTool] = useState<Record<string, number>>({});
   const [periodMenuOpen, setPeriodMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -142,13 +171,20 @@ export default function DashboardPage() {
     return () => clearInterval(id);
   }, [load]);
 
-  // Total Monthly Spend card only - the rest of the dashboard (alerts, renewals,
-  // budget setup, tools table) stays live/current-state regardless of the period
-  // picked here, since "active alert" or "upcoming renewal" isn't a past-tense
-  // concept the way a spend total is.
+  // Scopes the Total Monthly Spend KPI card AND the tools table's own "period
+  // spend" column below - the two always visibly sum to the same total, since
+  // both read from the same backend windowing (reports.service.ts). The rest
+  // of the dashboard (alerts, renewals, budget setup, cap/bar% in Budget
+  // Status) stays live/current-state regardless of the period picked here,
+  // since "active alert" or "upcoming renewal" isn't a past-tense concept the
+  // way a spend total is.
   const loadPeriodSpend = useCallback(async (period: SpendPeriod) => {
-    const r = await api.get<{ total: number }>(`/reports/period-spend?period=${period}`);
-    setPeriodSpendTotal(r.total);
+    const [totalRes, byToolRes] = await Promise.all([
+      api.get<{ total: number }>(`/reports/period-spend?period=${period}`),
+      api.get<Record<string, number>>(`/reports/period-spend-by-tool?period=${period}`),
+    ]);
+    setPeriodSpendTotal(totalRes.total);
+    setPeriodSpendByTool(byToolRes);
   }, []);
 
   useEffect(() => { loadPeriodSpend(spendPeriod); }, [spendPeriod, loadPeriodSpend]);
@@ -181,6 +217,9 @@ export default function DashboardPage() {
 
   const noBudgetNames = tools.filter((t) => t.paymentKind === 'NOBUDGET').map((t) => t.name).join(' & ') || 'None';
   const nearestRenewalText = (kpis?.renewalCount ?? 0) === 0 ? 'No upcoming renewals' : 'within the next 5 days';
+
+  const periodColumnLabel = PERIOD_OPTIONS.find((p) => p.key === spendPeriod)?.label ?? 'This Month';
+  const HEADERS = ['Tool', 'Category', 'Payment', 'Budget Status', periodColumnLabel, 'Alert / Renewal Trigger', 'Next Renewal', 'Actions'];
 
   return (
     <div className="p-6">
@@ -258,7 +297,7 @@ export default function DashboardPage() {
               {makeFmt(currency, fxRate)(periodSpendTotal ?? kpis.totalMonthlySpend)}
             </div>
             <div style={{ fontSize: 12, color: '#6b707b', marginTop: 11 }} title="A yearly subscription's cost is divided by 12 before being added to this total, so it reflects its true monthly rate.">
-              {PERIOD_OPTIONS.find((p) => p.key === spendPeriod)?.label.toLowerCase()} · yearly subscriptions pro-rated
+              {PERIOD_OPTIONS.find((p) => p.key === spendPeriod)?.label.toLowerCase()}{periodRangeSuffix(spendPeriod)} · yearly subscriptions pro-rated
             </div>
           </div>
 
@@ -340,11 +379,15 @@ export default function DashboardPage() {
         {displayed.map((tool) => {
           const fmtAmt = makeFmt(currency, fxRate);
           const { statusMain, statusSubColor, barColor, renewMain, renewSub, renewColor, renewUrgent, payBg, payColor, payLabel } = computeRow(tool, fmtAmt);
+          const periodAmount = periodSpendByTool[tool.id] ?? 0;
+          const remainingBalance = tool.integration?.lastSyncRemainingBalanceUSD;
           return (
             <ToolRow
               key={tool.id}
               tool={tool}
               statusMain={statusMain} statusSubColor={statusSubColor} barColor={barColor}
+              periodSpendDisplay={fmtAmt(periodAmount)}
+              remainingBalanceDisplay={remainingBalance != null ? fmtAmt(remainingBalance) : null}
               renewMain={renewMain} renewSub={renewSub} renewColor={renewColor} renewUrgent={renewUrgent}
               payBg={payBg} payColor={payColor} payLabel={payLabel}
               onEdit={() => setEditTool(tool)}
@@ -468,13 +511,18 @@ function fmtSyncAgo(iso: string): string {
   return `synced ${diffHr}h ago`;
 }
 
-function ToolRow({ tool, statusMain, statusSubColor, barColor, renewMain, renewSub, renewColor, renewUrgent, payBg, payColor, payLabel, onEdit, onIntegration, onMenu }: any) {
+function ToolRow({ tool, statusMain, statusSubColor, barColor, periodSpendDisplay, remainingBalanceDisplay, renewMain, renewSub, renewColor, renewUrgent, payBg, payColor, payLabel, onEdit, onIntegration, onMenu }: any) {
   const [hover, setHover] = useState(false);
   const hasIntegration = !!tool.integration;
   const syncError = tool.integration?.lastError;
+  const remainingBalance: number | null = tool.integration?.lastSyncRemainingBalanceUSD ?? null;
+  // Wallet-style providers (e.g. HeyGen) drain toward zero rather than climb toward a
+  // cap - a low balance is the meaningful warning signal here, not barPct. Fixed
+  // thresholds, not a configurable field (see docs/heygen-remaining-balance-loop-prompt.md).
+  const balanceColor = remainingBalance == null ? '#4a4f59' : remainingBalance < 1 ? '#F85149' : remainingBalance < 5 ? '#F5A623' : '#4a4f59';
   return (
     <div
-      style={{ display: 'grid', gridTemplateColumns: 'minmax(200px,2.1fr) 1.15fr 1fr 1.95fr 1.7fr 1.15fr 60px', alignItems: 'center', padding: '13px 22px', borderBottom: '1px solid #15181E', background: tool.alert ? (hover ? '#1a1018' : 'rgba(248,81,73,.03)') : (hover ? '#121419' : 'transparent'), boxShadow: `inset 3px 0 0 ${tool.alert ? '#F85149' : 'transparent'}`, transition: 'background .12s', cursor: 'pointer' }}
+      style={{ display: 'grid', gridTemplateColumns: GRID, alignItems: 'center', padding: '13px 22px', borderBottom: '1px solid #15181E', background: tool.alert ? (hover ? '#1a1018' : 'rgba(248,81,73,.03)') : (hover ? '#121419' : 'transparent'), boxShadow: `inset 3px 0 0 ${tool.alert ? '#F85149' : 'transparent'}`, transition: 'background .12s', cursor: 'pointer' }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       onClick={onEdit}
     >
@@ -533,6 +581,22 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, renewMain, renewS
             <div style={{ fontSize: 13, fontWeight: 600, color: '#cfd3da', letterSpacing: '-.01em' }}>{statusMain}</div>
             <div style={{ fontSize: 10.5, color: '#6b707b', marginTop: 2 }}>flat rate · no cap</div>
           </div>
+        ) : remainingBalanceDisplay ? (
+          // Wallet-style integration (e.g. HeyGen) - the meaningful number is a
+          // balance draining toward zero, not spend climbing toward a manually-set
+          // cap, so the usedAmount/capAmount bar doesn't apply here at all - show
+          // only the balance, as the primary figure rather than a secondary line.
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 650, color: balanceColor === '#4a4f59' ? '#cfd3da' : balanceColor, letterSpacing: '-.01em' }}>
+              {remainingBalance != null && remainingBalance < 5 && (
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8 2.5L14.5 13H1.5L8 2.5Z" strokeLinejoin="round" /><line x1="8" y1="6.5" x2="8" y2="9" /></svg>
+              )}
+              {remainingBalanceDisplay} left
+            </div>
+            {hasIntegration && tool.integration?.lastSyncAt && (
+              <div style={{ fontSize: 10, color: '#4a4f59', marginTop: 4 }}>{fmtSyncAgo(tool.integration.lastSyncAt)}</div>
+            )}
+          </div>
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
@@ -552,6 +616,17 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, renewMain, renewS
               </div>
             )}
           </>
+        )}
+      </div>
+
+      {/* Period Spend - this tool's contribution to the Total Monthly Spend KPI
+          card for the currently-selected dropdown period. Always $0 for
+          NOBUDGET tools (they're excluded from that total by design). */}
+      <div style={{ paddingRight: 14 }}>
+        {tool.paymentKind === 'NOBUDGET' ? (
+          <span style={{ fontSize: 12.5, color: '#4a4f59' }}>-</span>
+        ) : (
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#cfd3da', fontVariantNumeric: 'tabular-nums' }}>{periodSpendDisplay}</span>
         )}
       </div>
 

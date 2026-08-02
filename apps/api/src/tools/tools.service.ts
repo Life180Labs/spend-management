@@ -70,7 +70,7 @@ export class ToolsService {
 
     const tools = await this.prisma.tool.findMany({
       where,
-      include: { alertConfigs: { where: { isActive: true } }, integration: { select: { provider: true, lastSyncAt: true, lastSyncAmountUSD: true, lastSyncBreakdown: true, lastSyncByProject: true, isActive: true, lastError: true } } },
+      include: { alertConfigs: { where: { isActive: true } }, integration: { select: { provider: true, lastSyncAt: true, lastSyncAmountUSD: true, lastSyncBreakdown: true, lastSyncByProject: true, lastSyncRemainingBalanceUSD: true, isActive: true, lastError: true } } },
       orderBy: { name: 'asc' },
     });
 

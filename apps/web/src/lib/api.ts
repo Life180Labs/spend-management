@@ -32,8 +32,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new Error(err.message || 'Request failed');
   }
 
-  if (res.status === 204) return null as T;
-  return res.json();
+  // A NestJS handler returning `null` (a legitimate response for several endpoints -
+  // e.g. previewLimits/fetchLimits when a provider has no fetchLimitsUSD, like Claude
+  // and HeyGen) sends a 200/201 with a genuinely EMPTY body, not the JSON literal
+  // "null" - res.json() throws "Unexpected end of JSON input" on that. Read as text
+  // first and treat an empty body as `null` for any successful response, not just 204.
+  const text = await res.text();
+  if (!text) return null as T;
+  return JSON.parse(text);
 }
 
 async function tryRefresh(): Promise<boolean> {

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { IntegrationRunnerService, PROVIDERS } from './integration-runner.service';
 
@@ -92,12 +92,21 @@ export class IntegrationsService {
       throw new NotFoundException('Usage history is not available for this provider yet');
     }
 
-    const { amountUSD, breakdown, byProject } = await provider.fetchHistoricalSpendUSD(
-      integration.config as Record<string, any>,
-      { startDate, endDate },
-    );
+    let result: { amountUSD: number; breakdown: any[]; byProject: any[] };
+    try {
+      result = await provider.fetchHistoricalSpendUSD(
+        integration.config as Record<string, any>,
+        { startDate, endDate },
+      );
+    } catch (err: any) {
+      // A plain Error thrown by a provider (e.g. "token lacks permission") would
+      // otherwise be swallowed by Nest's default filter into a generic "Internal
+      // server error," hiding a message that's actually specific and actionable -
+      // surface it to the client instead.
+      throw new BadRequestException(err.message || 'Could not fetch usage history from the provider.');
+    }
 
-    return { amountUSD, breakdown, byProject, startDate, endDate };
+    return { ...result, startDate, endDate };
   }
 
   async syncNow(toolId: string, orgId: string) {

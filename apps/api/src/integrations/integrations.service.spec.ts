@@ -13,7 +13,7 @@ jest.mock('./providers/claude.provider', () => ({
   })),
 }));
 
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { IntegrationsService } from './integrations.service';
 import { PROVIDERS } from './integration-runner.service';
 
@@ -79,6 +79,18 @@ describe('IntegrationsService', () => {
       const result = await service.getUsageHistory('t1', 'org1', start, end);
       expect(result).toEqual({ amountUSD: 55, breakdown: [], byProject: [], startDate: start, endDate: end });
       expect(railway.fetchHistoricalSpendUSD).toHaveBeenCalledWith({}, { startDate: start, endDate: end });
+    });
+
+    it('surfaces the provider\'s real error message via a BadRequestException instead of letting it become a generic 500 (regression: a plain Error thrown by a provider was previously swallowed into "Internal server error" by Nest\'s default filter)', async () => {
+      prisma.tool.findFirst.mockResolvedValue({ id: 't1' });
+      prisma.toolIntegration.findUnique.mockResolvedValue({ provider: 'RAILWAY', config: {} });
+      railway.fetchHistoricalSpendUSD.mockRejectedValue(
+        new Error('Railway API token does not have permission to read projects or billing data.'),
+      );
+
+      const call = service.getUsageHistory('t1', 'org1', new Date(2026, 5, 1), new Date(2026, 6, 1));
+      await expect(call).rejects.toThrow(BadRequestException);
+      await expect(call).rejects.toThrow('Railway API token does not have permission to read projects or billing data.');
     });
   });
 

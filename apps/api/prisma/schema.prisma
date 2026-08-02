@@ -301,6 +301,7 @@ model ToolIntegration {
   lastSyncAmountUSD Float?
   lastSyncBreakdown Json?     // per-measurement breakdown from the last sync, e.g. [{measurement, amountUSD, rawValue}]
   lastSyncByProject Json?     // per-project breakdown from the last sync, e.g. [{projectId, projectName, amountUSD}]
+  lastSyncRemainingBalanceUSD Float? // wallet-style providers only (e.g. HeyGen) - null for every other provider
   lastError         String?
   isActive          Boolean   @default(true)
   createdAt         DateTime  @default(now())

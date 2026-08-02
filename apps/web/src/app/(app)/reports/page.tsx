@@ -42,6 +42,30 @@ function yearToDateMonthKeys(): string[] {
   return keys;
 }
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function monthKeyToLabel(monthKey: string): string {
+  const [year, month] = monthKey.split('-');
+  return `${MONTH_NAMES[parseInt(month, 10) - 1]} ${year}`;
+}
+
+// A visible "what date range am I actually looking at" label - without this, a
+// period like "This Quarter" can look identical to "Current Month" whenever
+// there's no data yet for the quarter's earlier months, which reads as broken
+// even though the underlying filter is correct.
+function periodRangeLabel(period: Period, customFrom: string, customTo: string): string {
+  const now = new Date();
+  if (period === 'current') return monthKeyToLabel(monthKeyNMonthsAgo(0));
+  if (period === 'last') return monthKeyToLabel(monthKeyNMonthsAgo(1));
+  if (period === 'quarter') {
+    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+    const quarterEndMonth = quarterStartMonth + 2;
+    return `${MONTH_NAMES[quarterStartMonth]} – ${MONTH_NAMES[quarterEndMonth]} ${now.getFullYear()}`;
+  }
+  if (period === 'ytd') return `Jan – ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
+  return `${monthKeyToLabel(customFrom)} – ${monthKeyToLabel(customTo)}`;
+}
+
 const CAT_LABELS: Record<string, string> = {
   AI_LLM: 'AI / LLM', CLOUD_INFRA: 'Cloud Infra', COMMUNICATION: 'Communication',
   DEV_TOOLS: 'Dev Tools', DESIGN: 'Design', HOSTING: 'Hosting', MONITORING: 'Monitoring', OTHER: 'Other',
@@ -120,7 +144,7 @@ export default function ReportsPage() {
             if (tab === 'spend') {
               exportSpendAnalysis(categories, reportStats, currency, fxRate);
             } else {
-              exportBillingHistory(filteredBilling, periodLabel, currency, fxRate);
+              exportBillingHistory(filteredBilling, periodLabel, currency, fxRate, periodRangeLabel(period, customFrom, customTo));
             }
           }}
           label={tab === 'spend' ? 'Download Spend Report' : 'Download Billing History'}
@@ -242,7 +266,7 @@ export default function ReportsPage() {
                   <span style={{ fontSize: 13, fontWeight: 550, color: '#E6E8EC' }}>{r.tool?.name || 'Deleted tool'}</span>
                 </div>
                 <div style={{ fontSize: 12, color: '#9aa0ab' }}>{CAT_LABELS[r.tool?.category || ''] || r.tool?.category || '-'}</div>
-                <div style={{ fontSize: 12, color: '#9aa0ab' }}>{r.monthLabel}</div>
+                <div style={{ fontSize: 12, color: '#9aa0ab' }}>{periodRangeLabel(period, customFrom, customTo)}</div>
                 <div style={{ fontSize: 13.5, fontWeight: 650, color: '#F2F3F5', fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(r.amount)}</div>
                 <div>
                   {(() => {

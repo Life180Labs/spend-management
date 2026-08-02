@@ -16,6 +16,22 @@ export interface SpendResult {
   breakdown?: UsageBreakdownItem[];
   /** Per-project breakdown, if the provider can report one. */
   byProject?: ProjectBreakdownItem[];
+  /**
+   * The provider's current account balance, for wallet-style providers where
+   * that's a meaningful concept (e.g. HeyGen's prepaid wallet). Most providers
+   * (Railway, Claude) have no such number and simply never return this field.
+   */
+  remainingBalanceUSD?: number;
+  /**
+   * Arbitrary provider-specific state to merge into ToolIntegration.config after a
+   * successful sync, for providers whose spend can't be recomputed from scratch on
+   * every call (e.g. HeyGen's prepaid wallet only ever reports a remaining balance,
+   * never a queryable "spend in this date range" total - the provider has to track
+   * balance deltas itself across syncs, which means remembering the last-seen
+   * balance). Providers that never return this (Railway, Claude) leave config
+   * completely untouched - see IntegrationRunnerService.runOne.
+   */
+  providerState?: Record<string, any>;
 }
 
 export interface IntegrationProvider {

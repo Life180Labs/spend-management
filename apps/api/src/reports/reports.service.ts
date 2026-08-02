@@ -286,6 +286,56 @@ export class ReportsService {
   }
 
   /**
+   * Every tool's contribution to the current month, keyed by toolId - mirrors
+   * currentMonthTotal's two parts (closed billing records for this month, rare
+   * but possible, PLUS each tool's live pro-rated spend) so the per-tool sum
+   * can never fall short of currentMonthTotal's aggregate figure.
+   */
+  private async currentMonthTotalByTool(orgId: string): Promise<Record<string, number>> {
+    const result = await this.closedMonthTotalByTool(orgId, currentMonthKey());
+
+    const tools = await this.prisma.tool.findMany({
+      where: { orgId, deletedAt: null },
+      select: { id: true, paymentKind: true, billingCycle: true, monthlyAmount: true, usedAmount: true },
+    });
+    for (const t of tools) {
+      if (t.paymentKind === 'NOBUDGET') continue;
+      const amount = monthlyEquivalentSpend(t);
+      if (amount > 0) result[t.id] = (result[t.id] ?? 0) + amount;
+    }
+    return result;
+  }
+
+  /** Closed billing records for one month, summed per toolId (at most one record per tool per month - see the (orgId, toolId, monthKey) unique constraint). */
+  private async closedMonthTotalByTool(orgId: string, monthKey: string): Promise<Record<string, number>> {
+    const records = await this.prisma.billingRecord.findMany({
+      where: { orgId, monthKey },
+      select: { toolId: true, amount: true },
+    });
+    const result: Record<string, number> = {};
+    for (const r of records) {
+      if (!r.toolId) continue;
+      result[r.toolId] = (result[r.toolId] ?? 0) + r.amount;
+    }
+    return result;
+  }
+
+  /**
+   * The set of monthKeys a non-"this_month" period spans - shared by periodSpend
+   * and periodSpendByTool so the two can never disagree about which months are
+   * "in" a given quarter/YTD window.
+   */
+  private monthKeysForPeriod(period: 'this_quarter' | 'year_to_date'): string[] {
+    const now = new Date();
+    const startMonth = period === 'this_quarter' ? Math.floor(now.getMonth() / 3) * 3 : 0; // 0-indexed
+    const monthKeys: string[] = [];
+    for (let m = startMonth; m <= now.getMonth(); m++) {
+      monthKeys.push(`${now.getFullYear()}-${String(m + 1).padStart(2, '0')}`);
+    }
+    return monthKeys;
+  }
+
+  /**
    * Total spend for the Dashboard's period dropdown. "This month" is live
    * (see currentMonthTotal); every other period sums closed billing-record
    * months plus the live current month where it falls inside the window (e.g.
@@ -306,23 +356,7 @@ export class ReportsService {
       return { total: await this.closedMonthTotal(orgId, lastMonth) };
     }
 
-    let monthKeys: string[];
-    if (period === 'this_quarter') {
-      const now = new Date();
-      const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3; // 0-indexed
-      monthKeys = [];
-      for (let m = quarterStartMonth; m <= now.getMonth(); m++) {
-        monthKeys.push(`${now.getFullYear()}-${String(m + 1).padStart(2, '0')}`);
-      }
-    } else {
-      // year_to_date
-      const now = new Date();
-      monthKeys = [];
-      for (let m = 0; m <= now.getMonth(); m++) {
-        monthKeys.push(`${now.getFullYear()}-${String(m + 1).padStart(2, '0')}`);
-      }
-    }
-
+    const monthKeys = this.monthKeysForPeriod(period);
     let total = 0;
     for (const monthKey of monthKeys) {
       total += monthKey === currentMonth
@@ -330,6 +364,35 @@ export class ReportsService {
         : await this.closedMonthTotal(orgId, monthKey);
     }
     return { total };
+  }
+
+  /**
+   * Same windowing as periodSpend, but broken down per tool instead of a single
+   * total - powers the Dashboard tools table's period-spend column, so each row
+   * visibly sums to the Total Monthly Spend KPI card above it.
+   */
+  async periodSpendByTool(orgId: string, period: DashboardSpendPeriod): Promise<Record<string, number>> {
+    const currentMonth = currentMonthKey();
+
+    if (period === 'this_month') {
+      return this.currentMonthTotalByTool(orgId);
+    }
+
+    if (period === 'last_month') {
+      return this.closedMonthTotalByTool(orgId, shiftMonthKey(currentMonth, -1));
+    }
+
+    const monthKeys = this.monthKeysForPeriod(period);
+    const result: Record<string, number> = {};
+    for (const monthKey of monthKeys) {
+      const byTool = monthKey === currentMonth
+        ? await this.currentMonthTotalByTool(orgId)
+        : await this.closedMonthTotalByTool(orgId, monthKey);
+      for (const [toolId, amount] of Object.entries(byTool)) {
+        result[toolId] = (result[toolId] ?? 0) + amount;
+      }
+    }
+    return result;
   }
 
   async dashboardKpis(orgId: string) {

@@ -4,11 +4,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IntegrationProvider } from './provider.interface';
 import { RailwayProvider } from './providers/railway.provider';
 import { ClaudeProvider } from './providers/claude.provider';
+import { HeyGenProvider } from './providers/heygen.provider';
 
 // Register new providers here - no other file needs to change.
 export const PROVIDERS: Record<string, IntegrationProvider> = {
   RAILWAY: new RailwayProvider(),
   CLAUDE: new ClaudeProvider(),
+  HEYGEN: new HeyGenProvider(),
 };
 
 @Injectable()
@@ -35,7 +37,7 @@ export class IntegrationRunnerService {
 
     try {
       const config = integration.config as Record<string, any>;
-      const { amountUSD, breakdown, byProject } = await provider.fetchSpendUSD(config);
+      const { amountUSD, breakdown, byProject, providerState, remainingBalanceUSD } = await provider.fetchSpendUSD(config);
 
       // Pull the latest budget cap too, if this provider can report one - keeps the
       // dashboard's cap in sync with whatever's configured on the provider's side,
@@ -79,7 +81,17 @@ export class IntegrationRunnerService {
             lastSyncAmountUSD: amountUSD,
             lastSyncBreakdown: (breakdown as unknown as Prisma.InputJsonValue) ?? undefined,
             lastSyncByProject: (byProject as unknown as Prisma.InputJsonValue) ?? undefined,
+            // A plain scalar, not a merge like config below - explicitly null (not
+            // undefined/"don't touch") for a provider that doesn't report a balance,
+            // so a tool that stops having one (or switches provider) doesn't keep
+            // showing a stale figure.
+            lastSyncRemainingBalanceUSD: remainingBalanceUSD ?? null,
             lastError: null,
+            // Only providers that can't recompute spend from scratch each sync (e.g.
+            // HeyGen's balance-delta tracking) return providerState. Prisma ignores
+            // `undefined` fields in an update, so a provider that never returns this
+            // (Railway, Claude) leaves config completely untouched.
+            config: providerState ? ({ ...config, ...providerState } as unknown as Prisma.InputJsonValue) : undefined,
           },
         });
       });

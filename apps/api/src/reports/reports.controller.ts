@@ -20,6 +20,12 @@ export class ReportsController {
     return this.reports.periodSpend(req.user.orgId, p);
   }
 
+  @Get('period-spend-by-tool')
+  periodSpendByTool(@Req() req: any, @Query('period') period?: string) {
+    const p = VALID_PERIODS.includes(period as DashboardSpendPeriod) ? (period as DashboardSpendPeriod) : 'this_month';
+    return this.reports.periodSpendByTool(req.user.orgId, p);
+  }
+
   @Get('spend-by-category')
   spendByCategory(@Req() req: any, @Query('monthKey') monthKey?: string) {
     return this.reports.spendByCategory(req.user.orgId, monthKey);
