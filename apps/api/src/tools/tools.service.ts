@@ -173,8 +173,12 @@ export class ToolsService {
     const thresholdPct = tool.alertConfigs?.[0]?.thresholdPct ?? tool.alertThresholdPct ?? 80;
     const alert = tool.paymentKind !== 'NOBUDGET' && tool.barPct >= thresholdPct;
 
+    // Clamped to 0 minimum, matching every other days-away calc in the codebase
+    // (dashboardKpis' nearestRenewal, checkRenewalReminders) - a renewal date that
+    // has passed but hasn't been rolled forward yet (daily cron runs once, at a
+    // fixed time) should read "renews today," not a confusing negative count.
     const daysUntilRenewal = tool.renewalDate
-      ? Math.ceil((new Date(tool.renewalDate).getTime() - Date.now()) / 86400000)
+      ? Math.max(0, Math.ceil((new Date(tool.renewalDate).getTime() - Date.now()) / 86400000))
       : null;
 
     return {

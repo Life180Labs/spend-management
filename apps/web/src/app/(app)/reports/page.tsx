@@ -12,12 +12,34 @@ interface BillingRecord {
   tool: { name: string; monoInitials: string; monoBgColor: string; category: string } | null;
 }
 
-type Period = 'current' | 'last' | 'custom';
+type Period = 'current' | 'last' | 'quarter' | 'ytd' | 'custom';
 
 function monthKeyNMonthsAgo(n: number): string {
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth() - n, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// Mirrors the backend's dashboard period-spend windowing (apps/api reports.service.ts
+// periodSpend) so "This Quarter" / "Year to Date" mean the same set of months everywhere
+// in the app, not just here.
+function quarterMonthKeys(): string[] {
+  const now = new Date();
+  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3; // 0-indexed
+  const keys: string[] = [];
+  for (let m = quarterStartMonth; m <= now.getMonth(); m++) {
+    keys.push(`${now.getFullYear()}-${String(m + 1).padStart(2, '0')}`);
+  }
+  return keys;
+}
+
+function yearToDateMonthKeys(): string[] {
+  const now = new Date();
+  const keys: string[] = [];
+  for (let m = 0; m <= now.getMonth(); m++) {
+    keys.push(`${now.getFullYear()}-${String(m + 1).padStart(2, '0')}`);
+  }
+  return keys;
 }
 
 const CAT_LABELS: Record<string, string> = {
@@ -66,9 +88,13 @@ export default function ReportsPage() {
 
   const periodLabel = period === 'current' ? monthKeyNMonthsAgo(0)
     : period === 'last' ? monthKeyNMonthsAgo(1)
+    : period === 'quarter' ? `Q${Math.floor(new Date().getMonth() / 3) + 1}_${new Date().getFullYear()}`
+    : period === 'ytd' ? `YTD_${new Date().getFullYear()}`
     : `${customFrom}_to_${customTo}`;
   const filteredBilling = period === 'current' ? billing.filter((r) => r.monthKey === monthKeyNMonthsAgo(0))
     : period === 'last' ? billing.filter((r) => r.monthKey === monthKeyNMonthsAgo(1))
+    : period === 'quarter' ? billing.filter((r) => quarterMonthKeys().includes(r.monthKey))
+    : period === 'ytd' ? billing.filter((r) => yearToDateMonthKeys().includes(r.monthKey))
     : billing.filter((r) => r.monthKey >= customFrom && r.monthKey <= customTo); // YYYY-MM sorts lexicographically
   const filteredTotal = filteredBilling.reduce((s, r) => s + r.amount, 0);
 
@@ -149,10 +175,12 @@ export default function ReportsPage() {
             <div style={{ display: 'grid', gridTemplateColumns: period === 'custom' ? '2fr 1fr 1fr' : '1fr', gap: 14, alignItems: 'end' }}>
               <div>
                 <label style={labelStyle}><Clock size={11} /> Period</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, maxWidth: 420 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, maxWidth: 660 }}>
                   {([
                     { key: 'current', label: 'Current Month' },
                     { key: 'last', label: 'Last Month' },
+                    { key: 'quarter', label: 'This Quarter' },
+                    { key: 'ytd', label: 'Year to Date' },
                     { key: 'custom', label: 'Custom' },
                   ] as const).map((p) => {
                     const on = period === p.key;

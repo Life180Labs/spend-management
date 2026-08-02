@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, type ReactNode } from 'react';
-import { Plus, Download } from 'lucide-react';
+import { Plus, Download, Calendar, ChevronDown, Check } from 'lucide-react';
 import { api } from '@/lib/api';
 import { fmtDate } from '@/lib/utils';
 import { exportToolsList } from '@/lib/excel';
@@ -43,6 +43,14 @@ const TABS = [
 
 const GRID = 'minmax(200px,2.1fr) 1.15fr 1fr 1.95fr 1.7fr 1.15fr 60px';
 const HEADERS = ['Tool', 'Category', 'Payment', 'Budget Status', 'Alert / Renewal Trigger', 'Next Renewal', 'Actions'];
+
+type SpendPeriod = 'this_month' | 'last_month' | 'this_quarter' | 'year_to_date';
+const PERIOD_OPTIONS: { key: SpendPeriod; label: string }[] = [
+  { key: 'this_month', label: 'This month' },
+  { key: 'last_month', label: 'Last month' },
+  { key: 'this_quarter', label: 'This quarter' },
+  { key: 'year_to_date', label: 'Year to date' },
+];
 
 function makeFmt(currency: 'INR' | 'USD', fxRate: number) {
   // Every stored amount is USD-native - the app's base currency. USD display
@@ -104,6 +112,9 @@ export default function DashboardPage() {
     () => (typeof window !== 'undefined' ? (localStorage.getItem('spend_currency') as 'INR' | 'USD' | null) : null) ?? 'USD'
   );
   const [fxRate, setFxRate] = useState(94.4);
+  const [spendPeriod, setSpendPeriod] = useState<SpendPeriod>('this_month');
+  const [periodSpendTotal, setPeriodSpendTotal] = useState<number | null>(null);
+  const [periodMenuOpen, setPeriodMenuOpen] = useState(false);
 
   useEffect(() => {
     fetch('https://api.frankfurter.app/latest?from=USD&to=INR')
@@ -130,6 +141,22 @@ export default function DashboardPage() {
     const id = setInterval(load, 30_000);
     return () => clearInterval(id);
   }, [load]);
+
+  // Total Monthly Spend card only - the rest of the dashboard (alerts, renewals,
+  // budget setup, tools table) stays live/current-state regardless of the period
+  // picked here, since "active alert" or "upcoming renewal" isn't a past-tense
+  // concept the way a spend total is.
+  const loadPeriodSpend = useCallback(async (period: SpendPeriod) => {
+    const r = await api.get<{ total: number }>(`/reports/period-spend?period=${period}`);
+    setPeriodSpendTotal(r.total);
+  }, []);
+
+  useEffect(() => { loadPeriodSpend(spendPeriod); }, [spendPeriod, loadPeriodSpend]);
+
+  useEffect(() => {
+    const id = setInterval(() => loadPeriodSpend(spendPeriod), 30_000);
+    return () => clearInterval(id);
+  }, [spendPeriod, loadPeriodSpend]);
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 2600); }
 
@@ -164,6 +191,37 @@ export default function DashboardPage() {
           <p style={{ fontSize: 12, color: '#767b86', marginTop: 3 }}>Monitor tool budgets, usage and alert thresholds across your stack.</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Period selector - scopes the Total Monthly Spend card only */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setPeriodMenuOpen((v) => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 12px', borderRadius: 9, background: 'transparent', border: '1px solid #1E212A', color: '#c2c6cf', fontSize: 12.5, fontWeight: 550, cursor: 'pointer' }}
+            >
+              <Calendar size={13} style={{ color: '#6b707b' }} />
+              {PERIOD_OPTIONS.find((p) => p.key === spendPeriod)?.label}
+              <ChevronDown size={13} style={{ color: '#6b707b' }} />
+            </button>
+            {periodMenuOpen && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setPeriodMenuOpen(false)} />
+                <div style={{ position: 'absolute', top: '110%', left: 0, background: '#1B1E26', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '4px 0', zIndex: 50, minWidth: 180, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                  {PERIOD_OPTIONS.map((p) => {
+                    const active = spendPeriod === p.key;
+                    return (
+                      <button
+                        key={p.key}
+                        onClick={() => { setSpendPeriod(p.key); setPeriodMenuOpen(false); }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: active ? 600 : 500, background: 'transparent', border: 'none', cursor: 'pointer', color: active ? '#E6E8EC' : '#9aa0ab' }}
+                      >
+                        {p.label}
+                        {active && <Check size={13} style={{ color: '#5E6AD2' }} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
           {/* Currency toggle */}
           <div style={{ display: 'flex', borderRadius: 8, border: '1px solid #1E212A', overflow: 'hidden' }}>
             {(['USD', 'INR'] as const).map((c) => (
@@ -196,9 +254,11 @@ export default function DashboardPage() {
                 {currency === 'INR' ? '₹' : '$'}
               </span>
             </div>
-            <div style={{ fontSize: 28, fontWeight: 680, color: '#F2F3F5', letterSpacing: '-.02em', lineHeight: 1 }}>{makeFmt(currency, fxRate)(kpis.totalMonthlySpend)}</div>
+            <div style={{ fontSize: 28, fontWeight: 680, color: '#F2F3F5', letterSpacing: '-.02em', lineHeight: 1 }}>
+              {makeFmt(currency, fxRate)(periodSpendTotal ?? kpis.totalMonthlySpend)}
+            </div>
             <div style={{ fontSize: 12, color: '#6b707b', marginTop: 11 }} title="A yearly subscription's cost is divided by 12 before being added to this total, so it reflects its true monthly rate.">
-              yearly subscriptions pro-rated
+              {PERIOD_OPTIONS.find((p) => p.key === spendPeriod)?.label.toLowerCase()} · yearly subscriptions pro-rated
             </div>
           </div>
 

@@ -107,5 +107,34 @@ describe('ToolsService', () => {
       expect(result.alert).toBe(false);
       expect(result.statusSub).toBe('No budget configured');
     });
+
+    it('clamps daysUntilRenewal to 0 for a renewal date that has already passed but not yet been rolled forward', async () => {
+      const yesterday = new Date(Date.now() - 26 * 60 * 60 * 1000); // ~1.1 days ago
+      prisma.tool.findFirst.mockResolvedValue({
+        id: 't1',
+        paymentKind: 'MOSUB',
+        barPct: 0,
+        alertConfigs: [],
+        renewalDate: yesterday,
+      });
+      const result = await service.findOne('t1', 'org1');
+      // Without the Math.max(0, ...) clamp this would be a negative number (e.g. -1),
+      // which the dashboard renders as the confusing "in -1d" - it should read as
+      // "renews today" (0) until the daily rollover cron catches up.
+      expect(result.daysUntilRenewal).toBe(0);
+    });
+
+    it('computes a positive daysUntilRenewal for a future renewal date', async () => {
+      const in3Days = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000 + 3600_000); // pad past exact 3.0 to avoid a ceil-boundary flake
+      prisma.tool.findFirst.mockResolvedValue({
+        id: 't1',
+        paymentKind: 'MOSUB',
+        barPct: 0,
+        alertConfigs: [],
+        renewalDate: in3Days,
+      });
+      const result = await service.findOne('t1', 'org1');
+      expect(result.daysUntilRenewal).toBe(4);
+    });
   });
 });

@@ -41,7 +41,28 @@ describe('SchedulerService', () => {
       expect(mail.sendThresholdAlert).toHaveBeenCalledWith('a@b.com', [
         { toolName: 'Railway', vendor: 'Railway.com', barPct: 90, thresholdPct: 80, capAmount: 20 },
         { toolName: 'Claude', vendor: 'Anthropic', barPct: 95, thresholdPct: 80, capAmount: null },
-      ]);
+      ], []);
+    });
+
+    it('includes the same recipient\'s upcoming renewals (within the 5-day lookahead) in the same email', async () => {
+      const breachingTool = { id: 't1', name: 'Railway', vendor: 'Railway.com', barPct: 90, alertThresholdPct: 80, capAmount: 20, triggerEmail: 'a@b.com' };
+      const renewingTool = {
+        id: 't2', name: 'Google Workspace', vendor: 'Google Workspace', barPct: 0, alertThresholdPct: 80, capAmount: 0,
+        triggerEmail: 'a@b.com', renewalDate: new Date(), monthlyAmount: 2.5,
+      };
+      // Two distinct findMany calls happen inside checkThresholdAlerts: the breaching-tools
+      // query, then the renewing-tools query (scoped to the recipients found above).
+      prisma.tool.findMany
+        .mockResolvedValueOnce([breachingTool])
+        .mockResolvedValueOnce([renewingTool]);
+
+      await service.checkThresholdAlerts();
+
+      expect(mail.sendThresholdAlert).toHaveBeenCalledWith(
+        'a@b.com',
+        [{ toolName: 'Railway', vendor: 'Railway.com', barPct: 90, thresholdPct: 80, capAmount: 20 }],
+        [{ toolName: 'Google Workspace', vendor: 'Google Workspace', renewalDate: renewingTool.renewalDate, daysAway: 0, monthlyAmount: 2.5 }],
+      );
     });
 
     it('sends separate emails to different recipients', async () => {

@@ -12,6 +12,14 @@ function formatMonthLabel(monthKey: string): string {
   return `${months[parseInt(month) - 1]} ${year}`;
 }
 
+function shiftMonthKey(monthKey: string, deltaMonths: number): string {
+  const [year, month] = monthKey.split('-').map(Number);
+  const d = new Date(year, month - 1 + deltaMonths, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export type DashboardSpendPeriod = 'this_month' | 'last_month' | 'this_quarter' | 'year_to_date';
+
 // Shape mirrors a BillingRecord (+ included tool) so the frontend can treat
 // live and historical rows identically.
 export interface SpendRow {
@@ -239,17 +247,23 @@ export class ReportsService {
     });
   }
 
-  async dashboardKpis(orgId: string) {
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+  /**
+   * This month's total spend: closed-out billing records for the current month
+   * (rare - usually empty until month-end) plus every active tool's live
+   * pro-rated contribution (see monthlyEquivalentSpend). This is the "live"
+   * figure - the only one of the four dashboard-spend-period options with no
+   * fixed historical answer, since the month isn't over yet.
+   */
+  private async currentMonthTotal(orgId: string): Promise<number> {
+    const currentMonth = currentMonthKey();
 
-    // Get historical billing records for this month
     const billingSum = await this.prisma.billingRecord.aggregate({
       where: { orgId, monthKey: currentMonth },
       _sum: { amount: true },
     });
     const historicalSpend = billingSum._sum.amount || 0;
 
-    // Get real-time tool spend (subscription tools use monthlyAmount pro-rated by
+    // Real-time tool spend (subscription tools use monthlyAmount pro-rated by
     // billingCycle, prepaid use usedAmount - see monthlyEquivalentSpend)
     const tools = await this.prisma.tool.findMany({
       where: { orgId, deletedAt: null },
@@ -260,7 +274,66 @@ export class ReportsService {
       return sum + monthlyEquivalentSpend(t);
     }, 0);
 
-    const totalThisMonth = historicalSpend + realtimeSpend;
+    return historicalSpend + realtimeSpend;
+  }
+
+  private async closedMonthTotal(orgId: string, monthKey: string): Promise<number> {
+    const sum = await this.prisma.billingRecord.aggregate({
+      where: { orgId, monthKey },
+      _sum: { amount: true },
+    });
+    return sum._sum.amount || 0;
+  }
+
+  /**
+   * Total spend for the Dashboard's period dropdown. "This month" is live
+   * (see currentMonthTotal); every other period sums closed billing-record
+   * months plus the live current month where it falls inside the window (e.g.
+   * "This quarter" includes the in-progress current month). A historical
+   * month with no billing record yet (e.g. the cron hasn't closed it out)
+   * contributes 0 rather than throwing - same convention as Reports' billing
+   * history / spend-by-category views.
+   */
+  async periodSpend(orgId: string, period: DashboardSpendPeriod) {
+    const currentMonth = currentMonthKey();
+
+    if (period === 'this_month') {
+      return { total: await this.currentMonthTotal(orgId) };
+    }
+
+    if (period === 'last_month') {
+      const lastMonth = shiftMonthKey(currentMonth, -1);
+      return { total: await this.closedMonthTotal(orgId, lastMonth) };
+    }
+
+    let monthKeys: string[];
+    if (period === 'this_quarter') {
+      const now = new Date();
+      const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3; // 0-indexed
+      monthKeys = [];
+      for (let m = quarterStartMonth; m <= now.getMonth(); m++) {
+        monthKeys.push(`${now.getFullYear()}-${String(m + 1).padStart(2, '0')}`);
+      }
+    } else {
+      // year_to_date
+      const now = new Date();
+      monthKeys = [];
+      for (let m = 0; m <= now.getMonth(); m++) {
+        monthKeys.push(`${now.getFullYear()}-${String(m + 1).padStart(2, '0')}`);
+      }
+    }
+
+    let total = 0;
+    for (const monthKey of monthKeys) {
+      total += monthKey === currentMonth
+        ? await this.currentMonthTotal(orgId)
+        : await this.closedMonthTotal(orgId, monthKey);
+    }
+    return { total };
+  }
+
+  async dashboardKpis(orgId: string) {
+    const totalThisMonth = await this.currentMonthTotal(orgId);
 
     const [alertCount, toolCount, noBudgetCount] = await Promise.all([
       this.prisma.$queryRaw<[{ count: bigint }]>`

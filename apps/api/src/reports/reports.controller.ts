@@ -1,6 +1,8 @@
 import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ReportsService } from './reports.service';
+import { ReportsService, DashboardSpendPeriod } from './reports.service';
+
+const VALID_PERIODS: DashboardSpendPeriod[] = ['this_month', 'last_month', 'this_quarter', 'year_to_date'];
 
 @Controller('reports')
 @UseGuards(JwtAuthGuard)
@@ -10,6 +12,12 @@ export class ReportsController {
   @Get('dashboard-kpis')
   dashboardKpis(@Req() req: any) {
     return this.reports.dashboardKpis(req.user.orgId);
+  }
+
+  @Get('period-spend')
+  periodSpend(@Req() req: any, @Query('period') period?: string) {
+    const p = VALID_PERIODS.includes(period as DashboardSpendPeriod) ? (period as DashboardSpendPeriod) : 'this_month';
+    return this.reports.periodSpend(req.user.orgId, p);
   }
 
   @Get('spend-by-category')
