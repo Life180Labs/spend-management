@@ -26,7 +26,7 @@ interface HistoryResult {
 
 const PROJECT_ROWS_SHOWN = 5;
 
-type Period = 'current' | 'last' | 'custom';
+type Period = 'current' | 'last' | 'quarter' | 'ytd' | 'custom';
 
 // Validated categorical pair (dataviz skill, --mode dark): CVD-safe on this app's dark surfaces.
 const MEASUREMENT_META: Record<string, { label: string; unit: string; color: string; icon: typeof Cpu }> = {
@@ -51,6 +51,22 @@ function monthRange(monthsAgo: number): { from: string; to: string } {
     ? now
     : new Date(now.getFullYear(), now.getMonth() - monthsAgo + 1, 0, 23, 59, 59);
   return { from: toLocalDateStr(start), to: toLocalDateStr(end) };
+}
+
+// Calendar quarter-to-date (Jul 1 – today for Q3), matching the same definition
+// used on Reports > Billing History and the Dashboard's period dropdown, so
+// "This Quarter" means the same set of dates everywhere in the app.
+function quarterRange(): { from: string; to: string } {
+  const now = new Date();
+  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+  const start = new Date(now.getFullYear(), quarterStartMonth, 1);
+  return { from: toLocalDateStr(start), to: toLocalDateStr(now) };
+}
+
+function yearToDateRange(): { from: string; to: string } {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1);
+  return { from: toLocalDateStr(start), to: toLocalDateStr(now) };
 }
 
 function fmtRangeLabel(from: string, to: string): string {
@@ -130,6 +146,8 @@ export default function UsageHistoryPage() {
   const rangeFor = useCallback((p: Period): { from: string; to: string } => {
     if (p === 'current') return monthRange(0);
     if (p === 'last') return monthRange(1);
+    if (p === 'quarter') return quarterRange();
+    if (p === 'ytd') return yearToDateRange();
     return { from: customFrom, to: customTo };
   }, [customFrom, customTo]);
 
@@ -218,7 +236,7 @@ export default function UsageHistoryPage() {
         <>
           {/* Filters */}
           <div style={{ background: '#0E1014', border: '1px solid #1A1D24', borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: period === 'custom' ? '1fr 1fr 1fr 1fr' : '1fr 2fr', gap: 14, alignItems: 'end' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: period === 'custom' ? '1fr 2fr 1fr 1fr' : '1fr 2.4fr', gap: 14, alignItems: 'end' }}>
               <div>
                 <label style={labelStyle}>Tool</label>
                 <select value={toolId} onChange={(e) => setToolId(e.target.value)} style={{ ...fieldStyle, cursor: 'pointer' }}>
@@ -228,12 +246,14 @@ export default function UsageHistoryPage() {
                 </select>
               </div>
 
-              <div style={{ gridColumn: period === 'custom' ? 'span 1' : 'span 1' }}>
+              <div>
                 <label style={labelStyle}><Clock size={11} /> Period</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
                   {([
                     { key: 'current', label: 'Current Month' },
                     { key: 'last', label: 'Last Month' },
+                    { key: 'quarter', label: 'This Quarter' },
+                    { key: 'ytd', label: 'Year to Date' },
                     { key: 'custom', label: 'Custom' },
                   ] as const).map((p) => {
                     const on = period === p.key;

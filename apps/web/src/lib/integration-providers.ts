@@ -31,7 +31,11 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderMeta[] = [
     tokenKey: 'apiToken',
     tokenLabel: 'API Token',
     placeholder: 'Paste your Railway API token',
-    helpText: 'railway.com → Account Settings → API Tokens',
+    // Counterintuitively, an Account-scoped token ("No workspace") CANNOT read budget
+    // limits or usage history for this app - only a token scoped TO the workspace can
+    // (verified empirically: Account-scoped only gets a bare current-spend number,
+    // Workspace-scoped gets spend + limits + history). Pick the workspace, not "No workspace".
+    helpText: 'railway.com → Account Settings → API Tokens → pick your workspace (not "No workspace")',
     hasLimits: true,
     defaultPaymentKind: 'PREPAID',
   },
