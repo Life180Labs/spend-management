@@ -54,4 +54,20 @@ describe('INTEGRATION_PROVIDERS', () => {
     expect(namecheap.defaultBillingCycle).toBe('YEARLY');
     expect(gws.defaultBillingCycle).toBe('MONTHLY');
   });
+
+  it('marks GCP as multiField (needs a service account JSON + several IDs, not one token) and hasLag (batch export, never "Live")', () => {
+    const gcp = INTEGRATION_PROVIDERS.find((p) => p.value === 'GCP')!;
+    expect(gcp.hasApi).toBe(true);
+    expect(gcp.multiField).toBe(true);
+    expect(gcp.hasLag).toBe(true);
+    expect(gcp.hasLimits).toBe(false);
+  });
+
+  it('every other provider defaults multiField/hasLag to falsy (only GCP opts in)', () => {
+    const others = INTEGRATION_PROVIDERS.filter((p) => p.value !== 'GCP');
+    others.forEach((p) => {
+      expect(p.multiField).toBeFalsy();
+      expect(p.hasLag).toBeFalsy();
+    });
+  });
 });

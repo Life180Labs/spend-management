@@ -17,6 +17,16 @@ export interface IntegrationProviderMeta {
   defaultPaymentKind: 'PREPAID' | 'MOSUB';
   /** Only meaningful for MOSUB vendors. */
   defaultBillingCycle?: 'MONTHLY' | 'YEARLY';
+  /** True when connecting needs more than one credential field (e.g. GCP needs a
+   * service account JSON key plus project/dataset/table/billing-account IDs, not
+   * a single token) - the Add Tool and Configure Integration modals render a
+   * provider-specific field set instead of the generic single tokenKey input. */
+  multiField?: boolean;
+  /** True when the provider's data is inherently batch/delayed rather than live
+   * (e.g. GCP's BigQuery Billing Export, hours-to-days behind) - anywhere this
+   * provider's synced amount is shown, it must read as "delayed," never "Live",
+   * so it's never confused with a truly real-time sync. */
+  hasLag?: boolean;
 }
 
 // Single source of truth for which integrations/known vendors are supported,
@@ -90,6 +100,25 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderMeta[] = [
     // manually, even in "Connect account" mode.
     hasLimits: false,
     defaultPaymentKind: 'PREPAID',
+  },
+  {
+    value: 'GCP',
+    label: 'Google Cloud Platform',
+    vendor: 'Google Cloud',
+    hasApi: true,
+    // Not a single token - see multiField below. tokenKey still matches the config
+    // field the backend reads, kept for consistency with the generic shape.
+    tokenKey: 'serviceAccountJson',
+    tokenLabel: 'Service Account JSON Key',
+    placeholder: '',
+    helpText: 'GCP Console → BigQuery Billing Export must be enabled first - see docs/gcp-billing-integration-loop-prompt.md',
+    // No live limit-reading API (same reasoning as Claude/HeyGen).
+    hasLimits: false,
+    defaultPaymentKind: 'PREPAID',
+    multiField: true,
+    // BigQuery Billing Export is a daily batch, hours-to-5-days behind - never
+    // "Live" the way Railway/Claude/HeyGen's syncs are.
+    hasLag: true,
   },
 ];
 

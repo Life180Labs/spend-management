@@ -7,7 +7,7 @@ import { fmtDate } from '@/lib/utils';
 import { exportToolsList } from '@/lib/excel';
 import { AddToolModal } from '@/components/tools/add-tool-modal';
 import { IntegrationModal } from '@/components/tools/integration-modal';
-import { matchProviderByVendor } from '@/lib/integration-providers';
+import { matchProviderByVendor, INTEGRATION_PROVIDERS } from '@/lib/integration-providers';
 
 interface KPIs {
   totalMonthlySpend: number;
@@ -36,7 +36,7 @@ const CAT_LABELS: Record<string, string> = {
 
 const TABS = [
   { key: 'All', label: 'All' },
-  { key: 'PREPAID', label: 'Pre-paid' },
+  { key: 'PREPAID', label: 'Usage-based' },
   { key: 'MOSUB', label: 'Subscription' },
   { key: 'NOBUDGET', label: 'Needs Budget' },
 ];
@@ -120,7 +120,7 @@ function computeRow(t: Tool, fmtAmt: (n: number) => string) {
   const payBg = isWallet ? 'rgba(14,165,168,0.14)' : t.paymentKind === 'PREPAID' ? 'rgba(94,106,210,0.14)' : 'rgba(255,255,255,0.05)';
   const payColor = isWallet ? '#4fc9cb' : t.paymentKind === 'PREPAID' ? '#9aa2ef' : '#9aa0ab';
   const payLabel = isWallet ? 'Wallet'
-    : t.paymentKind === 'PREPAID' ? 'Pre-paid' : t.paymentKind === 'NOBUDGET' ? 'No budget' : 'Subscription';
+    : t.paymentKind === 'PREPAID' ? 'Usage-based' : t.paymentKind === 'NOBUDGET' ? 'No budget' : 'Subscription';
 
   return { statusMain, statusSubColor, barColor, renewMain, renewSub, renewColor, renewUrgent, payBg, payColor, payLabel };
 }
@@ -515,6 +515,11 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, periodSpendDispla
   const [hover, setHover] = useState(false);
   const hasIntegration = !!tool.integration;
   const syncError = tool.integration?.lastError;
+  // Batch-exported providers (currently just GCP's BigQuery Billing Export, hours-to-
+  // days behind) must never read "Live" - that would misrepresent how fresh the number
+  // actually is. Looked up by provider key, not vendor text, since this is about which
+  // integration is connected, not the tool's free-text vendor field.
+  const hasLag = !!INTEGRATION_PROVIDERS.find((p) => p.value === tool.integration?.provider)?.hasLag;
   const remainingBalance: number | null = tool.integration?.lastSyncRemainingBalanceUSD ?? null;
   // Wallet-style providers (e.g. HeyGen) drain toward zero rather than climb toward a
   // cap - a low balance is the meaningful warning signal here, not barPct. Fixed
@@ -540,11 +545,21 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, periodSpendDispla
             {hasIntegration ? (
               <button
                 onClick={(e: React.MouseEvent) => { e.stopPropagation(); onIntegration(); }}
-                title={syncError ? `Sync error: ${syncError}` : 'Integration active - click to configure'}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 20, background: syncError ? 'rgba(248,81,73,.12)' : 'rgba(63,185,80,.1)', border: `1px solid ${syncError ? 'rgba(248,81,73,.3)' : 'rgba(63,185,80,.25)'}`, color: syncError ? '#F85149' : '#3FB950', fontSize: 9.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '.03em' }}
+                title={
+                  syncError ? `Sync error: ${syncError}`
+                    : hasLag ? 'Batch-exported data (e.g. BigQuery Billing Export) - hours to a few days behind, never real-time. Click to configure.'
+                      : 'Integration active - click to configure'
+                }
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 20,
+                  background: syncError ? 'rgba(248,81,73,.12)' : hasLag ? 'rgba(245,166,35,.1)' : 'rgba(63,185,80,.1)',
+                  border: `1px solid ${syncError ? 'rgba(248,81,73,.3)' : hasLag ? 'rgba(245,166,35,.28)' : 'rgba(63,185,80,.25)'}`,
+                  color: syncError ? '#F85149' : hasLag ? '#d99e3e' : '#3FB950',
+                  fontSize: 9.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '.03em',
+                }}
               >
                 <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'currentColor', flexShrink: 0, display: 'inline-block' }} />
-                {syncError ? 'Sync error' : 'Live'}
+                {syncError ? 'Sync error' : hasLag ? 'Periodic' : 'Live'}
               </button>
             ) : tool.isActive && (
               // No API sync exists for this tool (e.g. a manual subscription like Claude

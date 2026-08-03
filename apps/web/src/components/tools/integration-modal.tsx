@@ -50,9 +50,36 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
   const [provider, setProvider] = useState(vendorMatch?.value ?? PROVIDERS[0].value);
   const [apiToken, setApiToken] = useState('');
   const [showToken, setShowToken] = useState(false);
+  // GCP needs several fields instead of one token - see IntegrationProviderMeta.multiField.
+  const [gcpBillingAccountId, setGcpBillingAccountId] = useState('');
+  const [gcpProjectId, setGcpProjectId] = useState('');
+  const [gcpDatasetId, setGcpDatasetId] = useState('');
+  const [gcpTableName, setGcpTableName] = useState('');
+  const [gcpServiceAccountJson, setGcpServiceAccountJson] = useState('');
   const [appliedLimits, setAppliedLimits] = useState<ProviderLimits | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const selectedProvider = PROVIDERS.find((p) => p.value === provider) ?? PROVIDERS[0];
+  const isMultiField = !!selectedProvider.multiField;
+  const multiFieldReady = !!(gcpBillingAccountId.trim() && gcpProjectId.trim() && gcpDatasetId.trim() && gcpTableName.trim() && gcpServiceAccountJson.trim());
+  const credentialReady = isMultiField ? multiFieldReady : !!apiToken.trim();
+
+  function resetCredentialFields() {
+    setApiToken('');
+    setGcpBillingAccountId(''); setGcpProjectId(''); setGcpDatasetId(''); setGcpTableName(''); setGcpServiceAccountJson('');
+  }
+
+  function buildConfig(): Record<string, string> {
+    if (isMultiField) {
+      return {
+        serviceAccountJson: gcpServiceAccountJson.trim(),
+        gcpProjectId: gcpProjectId.trim(),
+        datasetId: gcpDatasetId.trim(),
+        tableName: gcpTableName.trim(),
+        billingAccountId: gcpBillingAccountId.trim(),
+      };
+    }
+    return { [selectedProvider.tokenKey]: apiToken.trim() };
+  }
   // Once an integration exists, its provider is fixed too - never let the dropdown offer
   // to silently re-point an already-connected tool at a different provider.
   const providerLocked = !!integration || !!vendorMatch;
@@ -77,11 +104,14 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
   }, [toolId]);
 
   async function handleSave() {
-    if (!apiToken.trim()) { setFormError(`${selectedProvider.tokenLabel} is required`); return; }
+    if (!credentialReady) {
+      setFormError(isMultiField ? 'All GCP fields are required' : `${selectedProvider.tokenLabel} is required`);
+      return;
+    }
     setFormError(''); setSaving(true);
     try {
-      await api.put(`/integrations/${toolId}`, { provider, config: { [selectedProvider.tokenKey]: apiToken.trim() } });
-      setApiToken('');
+      await api.put(`/integrations/${toolId}`, { provider, config: buildConfig() });
+      resetCredentialFields();
 
       // Fetch usage limits from the provider and auto-apply to the tool - a no-op
       // (null) for providers that don't expose one, so no per-provider gate needed here.
@@ -125,7 +155,7 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
     try {
       await api.delete(`/integrations/${toolId}`);
       setIntegration(null);
-      setApiToken('');
+      resetCredentialFields();
       onSynced();
     } catch (err: any) {
       setFormError(err.message || 'Failed to disconnect');
@@ -273,7 +303,7 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
                   ) : (
                     <select
                       value={provider}
-                      onChange={(e) => setProvider(e.target.value)}
+                      onChange={(e) => { setProvider(e.target.value); resetCredentialFields(); }}
                       style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 13 }}
                     >
                       {PROVIDERS.filter((p) => p.hasApi).map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
@@ -281,32 +311,64 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
                   )}
                 </div>
 
-                {/* API Token */}
+                {/* Credentials - a single token for most providers, or GCP's 5-field form */}
                 <div style={{ marginBottom: 20 }}>
-                  <label style={{ display: 'block', fontSize: 11.5, color: '#9aa0ab', marginBottom: 6 }}>
-                    {selectedProvider.tokenLabel}
-                    {isConnected && <span style={{ color: '#4a4f59', marginLeft: 6 }}>(re-enter to update)</span>}
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type={showToken ? 'text' : 'password'}
-                      value={apiToken}
-                      onChange={(e) => setApiToken(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }}
-                      placeholder={isConnected ? `Enter new ${selectedProvider.tokenLabel.toLowerCase()} to update` : selectedProvider.placeholder}
-                      style={{ ...S, width: '100%', padding: '9px 40px 9px 12px', borderRadius: 10, fontSize: 13, boxSizing: 'border-box' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowToken(!showToken)}
-                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#5e636e', cursor: 'pointer', padding: 2 }}
-                    >
-                      {showToken ? <EyeOffIcon /> : <EyeIcon />}
-                    </button>
-                  </div>
-                  <p style={{ fontSize: 11, color: '#4a4f59', marginTop: 6 }}>
-                    {selectedProvider.helpText}
-                  </p>
+                  {isMultiField ? (
+                    <>
+                      <label style={{ display: 'block', fontSize: 11.5, color: '#9aa0ab', marginBottom: 6 }}>
+                        GCP credentials
+                        {isConnected && <span style={{ color: '#4a4f59', marginLeft: 6 }}>(re-enter all fields to update)</span>}
+                      </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <input type="text" value={gcpBillingAccountId} onChange={(e) => setGcpBillingAccountId(e.target.value)}
+                          placeholder="Billing Account ID (XXXXXX-XXXXXX-XXXXXX)"
+                          style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 13, boxSizing: 'border-box' }} />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          <input type="text" value={gcpProjectId} onChange={(e) => setGcpProjectId(e.target.value)}
+                            placeholder="GCP Project ID"
+                            style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 13, boxSizing: 'border-box' }} />
+                          <input type="text" value={gcpDatasetId} onChange={(e) => setGcpDatasetId(e.target.value)}
+                            placeholder="Dataset ID"
+                            style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 13, boxSizing: 'border-box' }} />
+                        </div>
+                        <input type="text" value={gcpTableName} onChange={(e) => setGcpTableName(e.target.value)}
+                          placeholder="Table Name (gcp_billing_export_v1_...)"
+                          style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 12, fontFamily: 'monospace', boxSizing: 'border-box' }} />
+                        <textarea value={gcpServiceAccountJson} onChange={(e) => setGcpServiceAccountJson(e.target.value)}
+                          placeholder="Paste the full contents of the downloaded service account JSON key file"
+                          rows={3} spellCheck={false}
+                          style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 11, fontFamily: 'monospace', lineHeight: 1.5, boxSizing: 'border-box', resize: 'vertical' }} />
+                      </div>
+                      <p style={{ fontSize: 11, color: '#4a4f59', marginTop: 6 }}>{selectedProvider.helpText}</p>
+                    </>
+                  ) : (
+                    <>
+                      <label style={{ display: 'block', fontSize: 11.5, color: '#9aa0ab', marginBottom: 6 }}>
+                        {selectedProvider.tokenLabel}
+                        {isConnected && <span style={{ color: '#4a4f59', marginLeft: 6 }}>(re-enter to update)</span>}
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showToken ? 'text' : 'password'}
+                          value={apiToken}
+                          onChange={(e) => setApiToken(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }}
+                          placeholder={isConnected ? `Enter new ${selectedProvider.tokenLabel.toLowerCase()} to update` : selectedProvider.placeholder}
+                          style={{ ...S, width: '100%', padding: '9px 40px 9px 12px', borderRadius: 10, fontSize: 13, boxSizing: 'border-box' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowToken(!showToken)}
+                          style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#5e636e', cursor: 'pointer', padding: 2 }}
+                        >
+                          {showToken ? <EyeOffIcon /> : <EyeIcon />}
+                        </button>
+                      </div>
+                      <p style={{ fontSize: 11, color: '#4a4f59', marginTop: 6 }}>
+                        {selectedProvider.helpText}
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 {/* Actions */}
@@ -339,8 +401,8 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
 
                   <button
                     onClick={handleSave}
-                    disabled={saving || !apiToken.trim()}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 10, background: '#5E6AD2', border: 'none', color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: (saving || !apiToken.trim()) ? 'not-allowed' : 'pointer', opacity: (saving || !apiToken.trim()) ? 0.5 : 1, flexShrink: 0 }}
+                    disabled={saving || !credentialReady}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 10, background: '#5E6AD2', border: 'none', color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: (saving || !credentialReady) ? 'not-allowed' : 'pointer', opacity: (saving || !credentialReady) ? 0.5 : 1, flexShrink: 0 }}
                   >
                     {saving && <Loader2 size={13} className="animate-spin" />}
                     {isConnected ? 'Update' : 'Connect'}

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AddToolModal } from './add-tool-modal';
 
@@ -84,6 +84,84 @@ describe('AddToolModal', () => {
 
     const railwayOption = screen.getByRole('option', { name: 'Railway' }) as HTMLOptionElement;
     expect(railwayOption.disabled).toBe(false);
+  });
+
+  it('GCP: renders the multi-field connect form instead of a single API key input, Connect stays disabled until all 5 fields are filled', async () => {
+    (api.get as jest.Mock).mockResolvedValue([{ id: 'dept1' }]);
+    const user = userEvent.setup();
+
+    render(<AddToolModal onClose={jest.fn()} onCreated={jest.fn()} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add tool' })).not.toBeDisabled());
+
+    const integrationSelect = screen.getAllByRole('combobox')[0];
+    await user.selectOptions(integrationSelect, 'GCP');
+
+    expect(screen.getByPlaceholderText('XXXXXX-XXXXXX-XXXXXX')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('my-billing-project-123456')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('spend_management_dataset')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('gcp_billing_export_v1_...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Paste the full contents of the downloaded JSON key file')).toBeInTheDocument();
+    // The generic single-token input other providers use must NOT also render.
+    expect(screen.queryByPlaceholderText('Paste your Railway API token')).not.toBeInTheDocument();
+
+    const connectBtn = screen.getByRole('button', { name: 'Connect' });
+    expect(connectBtn).toBeDisabled();
+
+    await user.type(screen.getByPlaceholderText('XXXXXX-XXXXXX-XXXXXX'), '014575-49CC35-F26E91');
+    await user.type(screen.getByPlaceholderText('my-billing-project-123456'), 'direct-volt-497417-f0');
+    await user.type(screen.getByPlaceholderText('spend_management_dataset'), 'spend_management_dataset');
+    await user.type(screen.getByPlaceholderText('gcp_billing_export_v1_...'), 'gcp_billing_export_v1_x');
+    // Still disabled with 4/5 fields filled.
+    expect(connectBtn).toBeDisabled();
+    fireEvent.change(screen.getByPlaceholderText('Paste the full contents of the downloaded JSON key file'), { target: { value: '{"client_email":"a","private_key":"b"}' } });
+
+    expect(connectBtn).not.toBeDisabled();
+  });
+
+  it('GCP: submits the 5-field config (not a single tokenKey) to the integration PUT endpoint', async () => {
+    (api.get as jest.Mock).mockResolvedValue([{ id: 'dept1' }]);
+    (api.post as jest.Mock).mockImplementation((path: string) => {
+      if (path === '/tools') return Promise.resolve({ id: 'tool1' });
+      if (path === '/integrations/preview-limits') return Promise.resolve(null); // GCP has no fetchLimitsUSD
+      return Promise.resolve(null);
+    });
+    (api.put as jest.Mock).mockResolvedValue({});
+    const user = userEvent.setup();
+    const onCreated = jest.fn();
+
+    render(<AddToolModal onClose={jest.fn()} onCreated={onCreated} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add tool' })).not.toBeDisabled());
+
+    await user.type(screen.getByPlaceholderText('e.g. ChatGPT'), 'GCP Prod');
+
+    const integrationSelect = screen.getAllByRole('combobox')[0];
+    await user.selectOptions(integrationSelect, 'GCP');
+
+    await user.type(screen.getByPlaceholderText('XXXXXX-XXXXXX-XXXXXX'), '014575-49CC35-F26E91');
+    await user.type(screen.getByPlaceholderText('my-billing-project-123456'), 'direct-volt-497417-f0');
+    await user.type(screen.getByPlaceholderText('spend_management_dataset'), 'spend_management_dataset');
+    await user.type(screen.getByPlaceholderText('gcp_billing_export_v1_...'), 'gcp_billing_export_v1_x');
+    fireEvent.change(screen.getByPlaceholderText('Paste the full contents of the downloaded JSON key file'), { target: { value: '{"client_email":"a","private_key":"b"}' } });
+
+    await user.click(screen.getByRole('button', { name: 'Connect' }));
+    // hasLimits: false -> "Connect" resolves straight to the manual budget-cap fields.
+    await waitFor(() => expect(screen.getByPlaceholderText('e.g. 1000')).toBeInTheDocument());
+
+    await user.type(screen.getByPlaceholderText('e.g. 1000'), '500');
+    await user.type(screen.getByPlaceholderText('admin'), 'ops');
+
+    await user.click(screen.getByRole('button', { name: 'Add & connect' }));
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/integrations/tool1', {
+      provider: 'GCP',
+      config: {
+        serviceAccountJson: '{"client_email":"a","private_key":"b"}',
+        gcpProjectId: 'direct-volt-497417-f0',
+        datasetId: 'spend_management_dataset',
+        tableName: 'gcp_billing_export_v1_x',
+        billingAccountId: '014575-49CC35-F26E91',
+      },
+    }));
   });
 
   it('blocks submit with a validation error when a required field is missing', async () => {

@@ -5,12 +5,14 @@ import { IntegrationProvider } from './provider.interface';
 import { RailwayProvider } from './providers/railway.provider';
 import { ClaudeProvider } from './providers/claude.provider';
 import { HeyGenProvider } from './providers/heygen.provider';
+import { GCPProvider } from './providers/gcp.provider';
 
 // Register new providers here - no other file needs to change.
 export const PROVIDERS: Record<string, IntegrationProvider> = {
   RAILWAY: new RailwayProvider(),
   CLAUDE: new ClaudeProvider(),
   HEYGEN: new HeyGenProvider(),
+  GCP: new GCPProvider(),
 };
 
 @Injectable()

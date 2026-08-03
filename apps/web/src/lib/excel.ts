@@ -120,7 +120,7 @@ interface ToolRow {
 }
 
 const PAY_LABELS: Record<string, string> = {
-  PREPAID: 'Pre-paid', MOSUB: 'Subscription', CAPSUB: 'Cap + Sub', NOBUDGET: 'No budget',
+  PREPAID: 'Usage-based', MOSUB: 'Subscription', CAPSUB: 'Cap + Sub', NOBUDGET: 'No budget',
 };
 
 export function exportToolsList(

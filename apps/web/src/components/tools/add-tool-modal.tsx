@@ -156,6 +156,7 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
   function handleProviderChange(value: string) {
     setConnectProvider(value);
     setApiKey(''); setFetchStatus('idle'); setLimits(null); setFetchError('');
+    setGcpBillingAccountId(''); setGcpProjectId(''); setGcpDatasetId(''); setGcpTableName(''); setGcpServiceAccountJson('');
     const p = INTEGRATION_PROVIDERS.find((x) => x.value === value);
     if (!p) return; // NONE - leave paymentKind/mode/vendor as the user already had them
     setPaymentKind(p.defaultPaymentKind);
@@ -164,9 +165,34 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
   }
 
   const [apiKey, setApiKey] = useState('');
+  // GCP needs several fields instead of one token - see IntegrationProviderMeta.multiField.
+  const [gcpBillingAccountId, setGcpBillingAccountId] = useState('');
+  const [gcpProjectId, setGcpProjectId] = useState('');
+  const [gcpDatasetId, setGcpDatasetId] = useState('');
+  const [gcpTableName, setGcpTableName] = useState('');
+  const [gcpServiceAccountJson, setGcpServiceAccountJson] = useState('');
   const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'ok' | 'err'>('idle');
   const [fetchError, setFetchError] = useState('');
   const [limits, setLimits] = useState<Limits | null>(null);
+
+  const isMultiField = !!selectedIntegration?.multiField;
+  const multiFieldReady = !!(gcpBillingAccountId.trim() && gcpProjectId.trim() && gcpDatasetId.trim() && gcpTableName.trim() && gcpServiceAccountJson.trim());
+  // Whether there's a credential to try connecting with - a single API key for
+  // most providers, or all five GCP fields filled in for a multiField one.
+  const connectKeyReady = isMultiField ? multiFieldReady : !!apiKey.trim();
+
+  function buildProviderConfig(): Record<string, string> {
+    if (isMultiField) {
+      return {
+        serviceAccountJson: gcpServiceAccountJson.trim(),
+        gcpProjectId: gcpProjectId.trim(),
+        datasetId: gcpDatasetId.trim(),
+        tableName: gcpTableName.trim(),
+        billingAccountId: gcpBillingAccountId.trim(),
+      };
+    }
+    return { [selectedIntegration!.tokenKey]: apiKey.trim() };
+  }
 
   // Vendor is implied once a known-vendor preset is picked, regardless of payment
   // type - auto-fill and lock it instead of asking the user to retype it.
@@ -193,13 +219,12 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
 
   /* ── fetch limits preview (add mode) ─────────────────────────────────── */
   async function fetchLimits() {
-    const key = apiKey.trim();
-    if (!key || !selectedIntegration) return;
+    if (!connectKeyReady || !selectedIntegration) return;
     setFetchStatus('loading'); setFetchError('');
     try {
       const res = await api.post<Limits | null>('/integrations/preview-limits', {
         provider: selectedIntegration.value,
-        config: { [selectedIntegration.tokenKey]: key },
+        config: buildProviderConfig(),
       });
       if (res) {
         setLimits(res);
@@ -292,11 +317,11 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
 
       const result = await api.post<any>('/tools', { ...payload, departmentId: depts[0]?.id });
 
-      if (mode === 'api' && selectedIntegration?.hasApi && apiKey.trim()) {
+      if (mode === 'api' && selectedIntegration?.hasApi && connectKeyReady) {
         try {
           await api.put(`/integrations/${result.id}`, {
             provider: selectedIntegration.value,
-            config: { [selectedIntegration.tokenKey]: apiKey.trim() },
+            config: buildProviderConfig(),
           });
         } catch { /* best-effort */ }
       }
@@ -403,11 +428,11 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
                 <label style={S.label}>Payment type</label>
                 {isEdit ? (
                   <div style={S.lockedInput}>
-                    {paymentKind === 'PREPAID' ? 'Pre-paid (usage-based)' : paymentKind === 'MOSUB' ? 'Subscription' : 'No budget'}
+                    {paymentKind === 'PREPAID' ? 'Usage-based' : paymentKind === 'MOSUB' ? 'Subscription' : 'No budget'}
                   </div>
                 ) : (
                   <select value={paymentKind} onChange={(e) => { setPaymentKind(e.target.value); setFetchStatus('idle'); setLimits(null); }} style={S.select}>
-                    <option value="PREPAID">Pre-paid (usage-based)</option>
+                    <option value="PREPAID">Usage-based</option>
                     <option value="MOSUB">Subscription</option>
                     <option value="NOBUDGET">No budget</option>
                   </select>
@@ -454,26 +479,68 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
               {/* Connect account panel - only reachable when selectedIntegration.hasApi */}
               {selectedIntegration?.hasApi && mode === 'api' && (
                 <div style={{ backgroundColor: '#0f1116', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '16px 16px 14px' }}>
-                  <label style={S.label}>{selectedIntegration.tokenLabel}</label>
-                  <input
-                    type="text"
-                    value={apiKey}
-                    onChange={(e) => { setApiKey(e.target.value); setFetchStatus('idle'); setLimits(null); }}
-                    placeholder={selectedIntegration.placeholder}
-                    autoComplete="off"
-                    spellCheck={false}
-                    style={{ ...S.input, marginBottom: 10, fontFamily: 'monospace', letterSpacing: '0.03em' }}
-                  />
+                  {isMultiField ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 10 }}>
+                      <div>
+                        <label style={S.label}>Billing Account ID</label>
+                        <input type="text" value={gcpBillingAccountId}
+                          onChange={(e) => { setGcpBillingAccountId(e.target.value); setFetchStatus('idle'); setLimits(null); }}
+                          placeholder="XXXXXX-XXXXXX-XXXXXX" autoComplete="off" style={S.input} />
+                      </div>
+                      <div style={S.row2}>
+                        <div>
+                          <label style={S.label}>GCP Project ID</label>
+                          <input type="text" value={gcpProjectId}
+                            onChange={(e) => { setGcpProjectId(e.target.value); setFetchStatus('idle'); setLimits(null); }}
+                            placeholder="my-billing-project-123456" autoComplete="off" style={S.input} />
+                        </div>
+                        <div>
+                          <label style={S.label}>Dataset ID</label>
+                          <input type="text" value={gcpDatasetId}
+                            onChange={(e) => { setGcpDatasetId(e.target.value); setFetchStatus('idle'); setLimits(null); }}
+                            placeholder="spend_management_dataset" autoComplete="off" style={S.input} />
+                        </div>
+                      </div>
+                      <div>
+                        <label style={S.label}>Table Name</label>
+                        <input type="text" value={gcpTableName}
+                          onChange={(e) => { setGcpTableName(e.target.value); setFetchStatus('idle'); setLimits(null); }}
+                          placeholder="gcp_billing_export_v1_..." autoComplete="off"
+                          style={{ ...S.input, fontFamily: 'monospace', fontSize: 12 }} />
+                      </div>
+                      <div>
+                        <label style={S.label}>Service Account JSON Key</label>
+                        <textarea value={gcpServiceAccountJson}
+                          onChange={(e) => { setGcpServiceAccountJson(e.target.value); setFetchStatus('idle'); setLimits(null); }}
+                          placeholder="Paste the full contents of the downloaded JSON key file"
+                          rows={4} spellCheck={false}
+                          style={{ ...S.input, fontFamily: 'monospace', fontSize: 11, resize: 'vertical' as const, lineHeight: 1.5 }} />
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <label style={S.label}>{selectedIntegration.tokenLabel}</label>
+                      <input
+                        type="text"
+                        value={apiKey}
+                        onChange={(e) => { setApiKey(e.target.value); setFetchStatus('idle'); setLimits(null); }}
+                        placeholder={selectedIntegration.placeholder}
+                        autoComplete="off"
+                        spellCheck={false}
+                        style={{ ...S.input, marginBottom: 10, fontFamily: 'monospace', letterSpacing: '0.03em' }}
+                      />
+                    </>
+                  )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <button type="button" onClick={fetchLimits}
-                      disabled={!apiKey.trim() || fetchStatus === 'loading'}
+                      disabled={!connectKeyReady || fetchStatus === 'loading'}
                       style={{
                         padding: '8px 16px', fontSize: 12, fontWeight: 600,
                         color: fetchStatus === 'ok' ? '#3FB950' : '#fff',
                         backgroundColor: fetchStatus === 'ok' ? 'rgba(63,185,80,0.12)' : '#5E6AD2',
                         border: fetchStatus === 'ok' ? '1px solid rgba(63,185,80,0.35)' : 'none',
-                        borderRadius: 7, cursor: (!apiKey.trim() || fetchStatus === 'loading') ? 'not-allowed' : 'pointer',
-                        opacity: !apiKey.trim() ? 0.5 : 1,
+                        borderRadius: 7, cursor: (!connectKeyReady || fetchStatus === 'loading') ? 'not-allowed' : 'pointer',
+                        opacity: !connectKeyReady ? 0.5 : 1,
                       }}>
                       {fetchStatus === 'loading'
                         ? (selectedIntegration.hasLimits ? 'Fetching…' : 'Connecting…')

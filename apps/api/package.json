@@ -16,6 +16,7 @@
     "db:seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
+    "@google-cloud/bigquery": "^8.3.1",
     "@nestjs/bull": "^10.2.1",
     "@nestjs/common": "^10.4.1",
     "@nestjs/config": "^3.2.3",

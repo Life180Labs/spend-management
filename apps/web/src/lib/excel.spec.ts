@@ -47,7 +47,7 @@ describe('exportToolsList', () => {
     );
 
     const rows = jsonToSheetSpy.mock.calls[0][0];
-    expect(rows[0]['Payment Type']).toBe('Pre-paid');
+    expect(rows[0]['Payment Type']).toBe('Usage-based');
     expect(rows[0]['Remaining Balance ($)']).toBe('-');
   });
 

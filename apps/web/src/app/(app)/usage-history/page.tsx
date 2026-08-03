@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Cpu, MemoryStick, Clock, History, RefreshCw } from 'lucide-react';
 import { api } from '@/lib/api';
 import { fmt } from '@/lib/utils';
+import { INTEGRATION_PROVIDERS } from '@/lib/integration-providers';
 
 interface BreakdownItem { measurement: string; amountUSD: number; rawValue: number; }
 interface ProjectBreakdownItem { projectId: string; projectName: string; amountUSD: number; }
@@ -203,6 +204,9 @@ export default function UsageHistoryPage() {
   const isCurrent = period === 'current';
   const selectedTool = tools.find((t) => t.id === toolId);
   const activeRange = rangeFor(period);
+  // Batch-exported providers (GCP's BigQuery Billing Export) are never truly "live" -
+  // even a fresh query just re-reads a table that's inherently hours-to-days behind.
+  const hasLag = !!INTEGRATION_PROVIDERS.find((p) => p.value === selectedTool?.integration?.provider)?.hasLag;
 
   const total = isCurrent ? (selectedTool?.usedAmount ?? 0) : (result?.amountUSD ?? 0);
   const breakdown = (isCurrent ? (selectedTool?.integration?.lastSyncBreakdown ?? []) : (result?.breakdown ?? []))
@@ -304,13 +308,24 @@ export default function UsageHistoryPage() {
           <div style={{ background: '#0E1014', border: '1px solid #1A1D24', borderRadius: 14, padding: '24px 26px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: '#cfd3da', marginBottom: 2 }}>
-                  {selectedTool ? `${selectedTool.name} · ${selectedTool.integration?.provider}` : ''}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: '#cfd3da' }}>
+                    {selectedTool ? `${selectedTool.name} · ${selectedTool.integration?.provider}` : ''}
+                  </span>
+                  {hasLag && (
+                    <span
+                      title="Batch-exported data (e.g. BigQuery Billing Export) - hours to a few days behind, never real-time"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 20, background: 'rgba(245,166,35,.1)', border: '1px solid rgba(245,166,35,.28)', color: '#d99e3e', fontSize: 9.5, fontWeight: 600, letterSpacing: '.03em' }}
+                    >
+                      <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'currentColor', flexShrink: 0, display: 'inline-block' }} />
+                      Periodic
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: 11, color: '#5e636e' }}>{fmtRangeLabel(activeRange.from, activeRange.to)}</div>
                 {syncedAt && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, fontSize: 10.5, color: '#4a4f59' }}>
-                    <span>{isCurrent ? 'Synced' : 'Live read'} {fmtFetchedAt(syncedAt)}</span>
+                    <span>{isCurrent ? 'Synced' : hasLag ? 'Queried' : 'Live read'} {fmtFetchedAt(syncedAt)}</span>
                     <button
                       type="button"
                       onClick={fetchHistory}
