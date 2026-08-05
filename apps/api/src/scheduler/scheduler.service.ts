@@ -6,6 +6,13 @@ import { IntegrationRunnerService, PROVIDERS } from '../integrations/integration
 import { BillingService } from '../billing/billing.service';
 import { advancePeriodUntilAfter } from './renewal-cycle.util';
 
+// Set on any deployment where these jobs are instead triggered externally
+// (e.g. Railway Cron Job services calling scripts/run-scheduled-job.ts) - a
+// serverless/sleeping web service has no running process to fire an in-process
+// timer anyway, but this also prevents double-running if the web service ever
+// does happen to be awake when Railway's own scheduler fires the same job.
+const IN_PROCESS_CRON_DISABLED = process.env.DISABLE_INPROCESS_SCHEDULER === 'true';
+
 @Injectable()
 export class SchedulerService {
   private readonly logger = new Logger(SchedulerService.name);
@@ -21,7 +28,7 @@ export class SchedulerService {
   ) { }
 
   // ── Integration data sync - every 15 minutes ─────────────────────
-  @Cron('*/15 * * * *')
+  @Cron('*/15 * * * *', { disabled: IN_PROCESS_CRON_DISABLED })
   async syncIntegrations() {
     await this.integrationRunner.runAll();
   }
@@ -30,7 +37,7 @@ export class SchedulerService {
   // the same recipient in one cycle (e.g. two PREPAID tools sharing an alert
   // email) - group by recipient first so each person gets ONE consolidated
   // email listing every breaching tool, not one email per tool.
-  @Cron('*/5 * * * *')
+  @Cron('*/5 * * * *', { disabled: IN_PROCESS_CRON_DISABLED })
   async checkThresholdAlerts() {
     const tools = await this.prisma.tool.findMany({
       where: {
@@ -112,7 +119,7 @@ export class SchedulerService {
   }
 
   // ── Renewal reminder - daily at 9 AM ─────────────────────────────
-  @Cron('0 9 * * *')
+  @Cron('0 9 * * *', { disabled: IN_PROCESS_CRON_DISABLED })
   async checkRenewalReminders() {
     const now = new Date();
     const in5Days = new Date();
@@ -158,7 +165,7 @@ export class SchedulerService {
   // a contract/license term, not a recurring one, so it's left alone here.
   // Cadence itself (monthly vs yearly) comes from each tool's billingCycle -
   // this is not "the monthly cron," it just happens to run once a day.
-  @Cron('10 9 * * *')
+  @Cron('10 9 * * *', { disabled: IN_PROCESS_CRON_DISABLED })
   async rollForwardRenewalDates() {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
@@ -209,7 +216,7 @@ export class SchedulerService {
   // `usedAmount` snapshot, which reflects "so far this new month" by the time
   // this runs). Together with the rollover cron, every tool with a connected
   // integration or a subscription now gets a Billing History entry automatically.
-  @Cron('20 0 1 * *')
+  @Cron('20 0 1 * *', { disabled: IN_PROCESS_CRON_DISABLED })
   async recordCompletedMonthUsageBilling() {
     const now = new Date();
     const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
