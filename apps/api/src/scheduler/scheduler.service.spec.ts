@@ -21,6 +21,7 @@ describe('SchedulerService', () => {
     jest.clearAllMocks();
     prisma = {
       tool: { findMany: jest.fn(), update: jest.fn() },
+      $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]), // DB-wake probe used by runWithDbRetry - resolved means "already awake"
     };
     mail = { sendThresholdAlert: jest.fn(), sendRenewalReminder: jest.fn() };
     integrationRunner = { runAll: jest.fn() };
@@ -173,6 +174,67 @@ describe('SchedulerService', () => {
 
       await service.recordCompletedMonthUsageBilling();
       expect(billing.recordCompletedCycle).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('runWithDbRetry (Postgres Serverless wake-up handling)', () => {
+    // Postgres can be asleep independently of the API service (Railway Serverless
+    // mode on the DB only) - the first connection attempt after that fails with
+    // Prisma's P1001 while it wakes up. These tests drive that retry loop directly
+    // via checkThresholdAlerts, which calls runWithDbRetry as its very first step.
+    const connErr = Object.assign(new Error("Can't reach database server at `x:5432`"), { code: 'P1001' });
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('proceeds with the job once the DB probe succeeds without needing a retry', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([{ '?column?': 1 }]);
+      prisma.tool.findMany.mockResolvedValue([]);
+
+      await service.checkThresholdAlerts();
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.tool.findMany).toHaveBeenCalled();
+    });
+
+    it('retries the DB probe with backoff on a connection error, then runs the job once it succeeds', async () => {
+      prisma.$queryRaw
+        .mockRejectedValueOnce(connErr)
+        .mockRejectedValueOnce(connErr)
+        .mockResolvedValueOnce([{ '?column?': 1 }]);
+      prisma.tool.findMany.mockResolvedValue([]);
+
+      const run = service.checkThresholdAlerts();
+      await jest.runAllTimersAsync();
+      await run;
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
+      expect(prisma.tool.findMany).toHaveBeenCalled(); // job's real logic still ran after the DB came back
+    });
+
+    it('gives up after exhausting all retries and skips the run - does not throw', async () => {
+      prisma.$queryRaw.mockRejectedValue(connErr);
+      prisma.tool.findMany.mockResolvedValue([]);
+
+      const run = service.checkThresholdAlerts();
+      await jest.runAllTimersAsync();
+      await expect(run).resolves.toBeUndefined(); // never throws, even when the DB never wakes up
+
+      expect(prisma.tool.findMany).not.toHaveBeenCalled(); // job body never ran
+    });
+
+    it('does not retry a non-connection database error - aborts immediately without running the job', async () => {
+      prisma.$queryRaw.mockRejectedValue(new Error('permission denied for table tools'));
+      prisma.tool.findMany.mockResolvedValue([]);
+
+      await service.checkThresholdAlerts();
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1); // no retry loop for a non-connection error
+      expect(prisma.tool.findMany).not.toHaveBeenCalled();
     });
   });
 });

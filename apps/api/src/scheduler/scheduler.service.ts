@@ -13,6 +13,15 @@ import { advancePeriodUntilAfter } from './renewal-cycle.util';
 // does happen to be awake when Railway's own scheduler fires the same job.
 const IN_PROCESS_CRON_DISABLED = process.env.DISABLE_INPROCESS_SCHEDULER === 'true';
 
+// Postgres can run in Railway's own Serverless mode independently of this API
+// service - if it's been idle 10+ minutes it sleeps, and the first connection
+// attempt after that can fail while it wakes back up (a known Railway cold-start
+// race, not specific to this app). Rather than let that one-off failure abort
+// a scheduled job, every job probes the DB with a cheap query first and retries
+// with backoff - by the time the probe succeeds, Postgres is confirmed awake
+// and the job's real queries proceed normally.
+const DB_WAKE_MAX_ATTEMPTS = 6; // ~2+4+6+8+10s = 30s total before giving up
+
 @Injectable()
 export class SchedulerService {
   private readonly logger = new Logger(SchedulerService.name);
@@ -27,10 +36,37 @@ export class SchedulerService {
     private billing: BillingService,
   ) { }
 
+  // Probes the DB and retries on a connection-unreachable error (Postgres
+  // waking from sleep) before running `fn`. Any other error, or exhausting all
+  // retries, is logged and the run is skipped - never thrown, so one sleepy
+  // Postgres never crashes the process or breaks the next scheduled tick.
+  private async runWithDbRetry(jobName: string, fn: () => Promise<void>): Promise<void> {
+    for (let attempt = 1; attempt <= DB_WAKE_MAX_ATTEMPTS; attempt++) {
+      try {
+        await this.prisma.$queryRaw`SELECT 1`;
+        break;
+      } catch (err: any) {
+        const isConnectionError = err?.code === 'P1001' || /Can't reach database server/i.test(err?.message ?? '');
+        if (!isConnectionError) {
+          this.logger.error(`${jobName}: non-connection database error, aborting this run - ${err.message}`);
+          return;
+        }
+        if (attempt === DB_WAKE_MAX_ATTEMPTS) {
+          this.logger.error(`${jobName}: database still unreachable after ${DB_WAKE_MAX_ATTEMPTS} attempts - skipping this run`);
+          return;
+        }
+        const delayMs = attempt * 2000;
+        this.logger.warn(`${jobName}: database unreachable (attempt ${attempt}/${DB_WAKE_MAX_ATTEMPTS}), likely waking from Serverless sleep - retrying in ${delayMs}ms`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+    await fn();
+  }
+
   // ── Integration data sync - every 15 minutes ─────────────────────
   @Cron('*/15 * * * *', { disabled: IN_PROCESS_CRON_DISABLED })
   async syncIntegrations() {
-    await this.integrationRunner.runAll();
+    await this.runWithDbRetry('syncIntegrations', () => this.integrationRunner.runAll());
   }
 
   // ── Threshold breach check - every 5 minutes. Multiple tools can breach for ──
@@ -39,6 +75,10 @@ export class SchedulerService {
   // email listing every breaching tool, not one email per tool.
   @Cron('*/5 * * * *', { disabled: IN_PROCESS_CRON_DISABLED })
   async checkThresholdAlerts() {
+    await this.runWithDbRetry('checkThresholdAlerts', () => this.checkThresholdAlertsImpl());
+  }
+
+  private async checkThresholdAlertsImpl() {
     const tools = await this.prisma.tool.findMany({
       where: {
         deletedAt: null,
@@ -121,6 +161,10 @@ export class SchedulerService {
   // ── Renewal reminder - daily at 9 AM ─────────────────────────────
   @Cron('0 9 * * *', { disabled: IN_PROCESS_CRON_DISABLED })
   async checkRenewalReminders() {
+    await this.runWithDbRetry('checkRenewalReminders', () => this.checkRenewalRemindersImpl());
+  }
+
+  private async checkRenewalRemindersImpl() {
     const now = new Date();
     const in5Days = new Date();
     in5Days.setDate(now.getDate() + 5);
@@ -167,6 +211,10 @@ export class SchedulerService {
   // this is not "the monthly cron," it just happens to run once a day.
   @Cron('10 9 * * *', { disabled: IN_PROCESS_CRON_DISABLED })
   async rollForwardRenewalDates() {
+    await this.runWithDbRetry('rollForwardRenewalDates', () => this.rollForwardRenewalDatesImpl());
+  }
+
+  private async rollForwardRenewalDatesImpl() {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
@@ -218,6 +266,10 @@ export class SchedulerService {
   // integration or a subscription now gets a Billing History entry automatically.
   @Cron('20 0 1 * *', { disabled: IN_PROCESS_CRON_DISABLED })
   async recordCompletedMonthUsageBilling() {
+    await this.runWithDbRetry('recordCompletedMonthUsageBilling', () => this.recordCompletedMonthUsageBillingImpl());
+  }
+
+  private async recordCompletedMonthUsageBillingImpl() {
     const now = new Date();
     const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
