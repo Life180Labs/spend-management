@@ -12,8 +12,8 @@
  *                   | rollForwardRenewalDates | recordCompletedMonthUsageBilling
  *
  * Railway Cron Job service start command, one per cadence:
- *   syncIntegrations                  - every 15 minutes
- *   checkThresholdAlerts              - every 5 minutes
+ *   syncIntegrations                  - hourly
+ *   checkThresholdAlerts              - hourly
  *   checkRenewalReminders             - daily at 9:00 (server timezone)
  *   rollForwardRenewalDates           - daily at 9:10 (server timezone)
  *   recordCompletedMonthUsageBilling  - monthly, 00:20 on the 1st

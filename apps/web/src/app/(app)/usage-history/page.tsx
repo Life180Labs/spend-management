@@ -153,7 +153,7 @@ export default function UsageHistoryPage() {
   }, [customFrom, customTo]);
 
   // Current Month is never fetched live from the provider — it reads the same
-  // usedAmount/breakdown the regular 15-min sync already wrote to the DB, so this
+  // usedAmount/breakdown the regular hourly sync already wrote to the DB, so this
   // page can never disagree with the dashboard about "current month" (they're
   // reading the same row). Last Month / Custom Range have nothing synced to read,
   // since the app only tracks the current period, so those still call the provider
@@ -374,7 +374,7 @@ export default function UsageHistoryPage() {
                   {fmtAmt(total)}
                 </div>
               ) : isCurrent ? (
-                <div style={{ fontSize: 13, color: '#5e636e' }}>Not synced yet — connect the integration or wait for the next 15-min sync.</div>
+                <div style={{ fontSize: 13, color: '#5e636e' }}>Not synced yet — connect the integration or wait for the next hourly sync.</div>
               ) : (
                 <div style={{ fontSize: 13, color: '#5e636e' }}>No data for this period.</div>
               )}

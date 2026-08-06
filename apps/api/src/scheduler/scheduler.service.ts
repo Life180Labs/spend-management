@@ -63,17 +63,17 @@ export class SchedulerService {
     await fn();
   }
 
-  // ── Integration data sync - every 15 minutes ─────────────────────
-  @Cron('*/15 * * * *', { disabled: IN_PROCESS_CRON_DISABLED })
+  // ── Integration data sync - hourly ────────────────────────────────
+  @Cron('0 * * * *', { disabled: IN_PROCESS_CRON_DISABLED })
   async syncIntegrations() {
     await this.runWithDbRetry('syncIntegrations', () => this.integrationRunner.runAll());
   }
 
-  // ── Threshold breach check - every 5 minutes. Multiple tools can breach for ──
-  // the same recipient in one cycle (e.g. two PREPAID tools sharing an alert
+  // ── Threshold breach check - hourly. Multiple tools can breach for the ──
+  // same recipient in one cycle (e.g. two PREPAID tools sharing an alert
   // email) - group by recipient first so each person gets ONE consolidated
   // email listing every breaching tool, not one email per tool.
-  @Cron('*/5 * * * *', { disabled: IN_PROCESS_CRON_DISABLED })
+  @Cron('0 * * * *', { disabled: IN_PROCESS_CRON_DISABLED })
   async checkThresholdAlerts() {
     await this.runWithDbRetry('checkThresholdAlerts', () => this.checkThresholdAlertsImpl());
   }
