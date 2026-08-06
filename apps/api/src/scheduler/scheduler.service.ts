@@ -5,6 +5,7 @@ import { MailService, ThresholdAlertItem, UpcomingRenewalItem } from '../mail/ma
 import { IntegrationRunnerService, PROVIDERS } from '../integrations/integration-runner.service';
 import { BillingService } from '../billing/billing.service';
 import { advancePeriodUntilAfter } from './renewal-cycle.util';
+import { waitForDatabaseAwake } from '../prisma/db-wake-retry.util';
 
 // Set on any deployment where these jobs are instead triggered externally
 // (e.g. Railway Cron Job services calling scripts/run-scheduled-job.ts) - a
@@ -12,15 +13,6 @@ import { advancePeriodUntilAfter } from './renewal-cycle.util';
 // timer anyway, but this also prevents double-running if the web service ever
 // does happen to be awake when Railway's own scheduler fires the same job.
 const IN_PROCESS_CRON_DISABLED = process.env.DISABLE_INPROCESS_SCHEDULER === 'true';
-
-// Postgres can run in Railway's own Serverless mode independently of this API
-// service - if it's been idle 10+ minutes it sleeps, and the first connection
-// attempt after that can fail while it wakes back up (a known Railway cold-start
-// race, not specific to this app). Rather than let that one-off failure abort
-// a scheduled job, every job probes the DB with a cheap query first and retries
-// with backoff - by the time the probe succeeds, Postgres is confirmed awake
-// and the job's real queries proceed normally.
-const DB_WAKE_MAX_ATTEMPTS = 6; // ~2+4+6+8+10s = 30s total before giving up
 
 @Injectable()
 export class SchedulerService {
@@ -36,29 +28,16 @@ export class SchedulerService {
     private billing: BillingService,
   ) { }
 
-  // Probes the DB and retries on a connection-unreachable error (Postgres
-  // waking from sleep) before running `fn`. Any other error, or exhausting all
-  // retries, is logged and the run is skipped - never thrown, so one sleepy
-  // Postgres never crashes the process or breaks the next scheduled tick.
+  // Waits for Postgres to be reachable (see db-wake-retry.util.ts - handles
+  // Railway Serverless sleep on the DB) before running `fn`. Unlike a
+  // user-facing request, a background job has no one waiting on it, so once
+  // retries are exhausted this logs and skips the run rather than throwing -
+  // one sleepy Postgres should never crash the process or break the next tick.
   private async runWithDbRetry(jobName: string, fn: () => Promise<void>): Promise<void> {
-    for (let attempt = 1; attempt <= DB_WAKE_MAX_ATTEMPTS; attempt++) {
-      try {
-        await this.prisma.$queryRaw`SELECT 1`;
-        break;
-      } catch (err: any) {
-        const isConnectionError = err?.code === 'P1001' || /Can't reach database server/i.test(err?.message ?? '');
-        if (!isConnectionError) {
-          this.logger.error(`${jobName}: non-connection database error, aborting this run - ${err.message}`);
-          return;
-        }
-        if (attempt === DB_WAKE_MAX_ATTEMPTS) {
-          this.logger.error(`${jobName}: database still unreachable after ${DB_WAKE_MAX_ATTEMPTS} attempts - skipping this run`);
-          return;
-        }
-        const delayMs = attempt * 2000;
-        this.logger.warn(`${jobName}: database unreachable (attempt ${attempt}/${DB_WAKE_MAX_ATTEMPTS}), likely waking from Serverless sleep - retrying in ${delayMs}ms`);
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
+    try {
+      await waitForDatabaseAwake(this.prisma, jobName, this.logger);
+    } catch {
+      return; // already logged inside waitForDatabaseAwake
     }
     await fn();
   }

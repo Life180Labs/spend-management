@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   UnauthorizedException,
   ConflictException,
   NotFoundException,
@@ -8,11 +9,14 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
+import { waitForDatabaseAwake } from '../prisma/db-wake-retry.util';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
@@ -109,11 +113,22 @@ export class AuthService {
     googleId: string;
     picture?: string;
   }) {
-    // Allowlist check
+    // Allowlist check - pure config, no DB needed, so this runs before we
+    // even wait on Postgres and fails fast for a genuinely unauthorized email.
     const raw = this.config.get<string>('ALLOWED_SSO_EMAILS', '');
     const allowed = raw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
     if (allowed.length > 0 && !allowed.includes(googleUser.email.toLowerCase())) {
       throw new UnauthorizedException(`${googleUser.email} is not authorized to access this workspace`);
+    }
+
+    // Postgres can be asleep (Railway Serverless mode on the DB) when this
+    // fires - unlike the background scheduler jobs, someone is actively
+    // waiting on this request, so a still-unreachable DB becomes a friendly
+    // error instead of a raw Prisma stack trace on the login page.
+    try {
+      await waitForDatabaseAwake(this.prisma, 'Google sign-in', this.logger);
+    } catch {
+      throw new Error('Sign-in is temporarily unavailable - please try again in a moment.');
     }
 
     // Find existing user by email
