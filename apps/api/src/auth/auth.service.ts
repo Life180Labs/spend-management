@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { waitForDatabaseAwake } from '../prisma/db-wake-retry.util';
@@ -195,8 +196,12 @@ export class AuthService {
     const refreshExpiry = new Date();
     refreshExpiry.setDate(refreshExpiry.getDate() + 30);
 
-    // Store hashed refresh token
-    const rawRefresh = this.jwt.sign(payload, {
+    // jti (random per call) - without it, two calls for the same user within
+    // the same second (JWT's iat has 1s resolution) sign byte-identical tokens,
+    // whose identical SHA-256 hash then violates tokenHash's unique constraint
+    // (e.g. a double-submitted OAuth callback, a double-clicked login button,
+    // two tabs signing in at once - all realistic, not just a testing fluke).
+    const rawRefresh = this.jwt.sign({ ...payload, jti: randomUUID() }, {
       secret: this.config.get('JWT_REFRESH_SECRET', 'refresh-secret'),
       expiresIn: '30d',
     });

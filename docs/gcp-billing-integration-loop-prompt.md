@@ -68,6 +68,12 @@ action in the GCP Console by whoever administers your billing account.
      project-wide, if you want to keep this tightly scoped — least-privilege)
    - `roles/bigquery.jobUser` on the hosting project (needed to *run* a query
      job, separate from being able to *read* the data)
+   - `roles/billing.viewer` on the billing account (optional — only needed if
+     you want the app to auto-read your configured GCP Budget amount/threshold
+     instead of entering the cap manually; a separate, narrower role from the
+     two above since it's a different API, billingbudgets.googleapis.com, not
+     BigQuery. Skip this if you don't have a GCP Budget set up — the app falls
+     back to manual entry gracefully either way.)
    - A **JSON key** downloaded for that service account (or, if you'd rather
      avoid long-lived keys, Workload Identity Federation — bigger setup, only
      worth it if you specifically want to avoid a static key file).

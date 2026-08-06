@@ -104,7 +104,9 @@ describe('AddToolModal', () => {
     // The generic single-token input other providers use must NOT also render.
     expect(screen.queryByPlaceholderText('Paste your Railway API token')).not.toBeInTheDocument();
 
-    const connectBtn = screen.getByRole('button', { name: 'Connect' });
+    // GCP is hasLimits: true, so the button reads "Fetch limits" (not the generic
+    // "Connect" other multiField-less providers get).
+    const connectBtn = screen.getByRole('button', { name: 'Fetch limits' });
     expect(connectBtn).toBeDisabled();
 
     await user.type(screen.getByPlaceholderText('XXXXXX-XXXXXX-XXXXXX'), '014575-49CC35-F26E91');
@@ -122,7 +124,7 @@ describe('AddToolModal', () => {
     (api.get as jest.Mock).mockResolvedValue([{ id: 'dept1' }]);
     (api.post as jest.Mock).mockImplementation((path: string) => {
       if (path === '/tools') return Promise.resolve({ id: 'tool1' });
-      if (path === '/integrations/preview-limits') return Promise.resolve(null); // GCP has no fetchLimitsUSD
+      if (path === '/integrations/preview-limits') return Promise.resolve(null); // no GCP Budget configured on this account - limitsOptional falls back to manual entry
       return Promise.resolve(null);
     });
     (api.put as jest.Mock).mockResolvedValue({});
@@ -143,8 +145,9 @@ describe('AddToolModal', () => {
     await user.type(screen.getByPlaceholderText('gcp_billing_export_v1_...'), 'gcp_billing_export_v1_x');
     fireEvent.change(screen.getByPlaceholderText('Paste the full contents of the downloaded JSON key file'), { target: { value: '{"client_email":"a","private_key":"b"}' } });
 
-    await user.click(screen.getByRole('button', { name: 'Connect' }));
-    // hasLimits: false -> "Connect" resolves straight to the manual budget-cap fields.
+    await user.click(screen.getByRole('button', { name: 'Fetch limits' }));
+    // No budget configured on this GCP account (preview-limits returned null) -
+    // limitsOptional falls back to the manual budget-cap fields instead of blocking.
     await waitFor(() => expect(screen.getByPlaceholderText('e.g. 1000')).toBeInTheDocument());
 
     await user.type(screen.getByPlaceholderText('e.g. 1000'), '500');

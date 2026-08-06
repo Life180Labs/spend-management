@@ -60,14 +60,20 @@ describe('INTEGRATION_PROVIDERS', () => {
     expect(gcp.hasApi).toBe(true);
     expect(gcp.multiField).toBe(true);
     expect(gcp.hasLag).toBe(true);
-    expect(gcp.hasLimits).toBe(false);
   });
 
-  it('every other provider defaults multiField/hasLag to falsy (only GCP opts in)', () => {
+  it('marks GCP as hasLimits + limitsOptional - it CAN read its configured budget, but a missing one (no GCP Budget set up) must fall back to manual entry, not block Connect', () => {
+    const gcp = INTEGRATION_PROVIDERS.find((p) => p.value === 'GCP')!;
+    expect(gcp.hasLimits).toBe(true);
+    expect(gcp.limitsOptional).toBe(true);
+  });
+
+  it('every other provider defaults multiField/hasLag/limitsOptional to falsy (only GCP opts in)', () => {
     const others = INTEGRATION_PROVIDERS.filter((p) => p.value !== 'GCP');
     others.forEach((p) => {
       expect(p.multiField).toBeFalsy();
       expect(p.hasLag).toBeFalsy();
+      expect(p.limitsOptional).toBeFalsy();
     });
   });
 });

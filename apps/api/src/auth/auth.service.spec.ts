@@ -44,6 +44,27 @@ describe('AuthService.loginOrCreateGoogleUser', () => {
     expect(tokens).toEqual({ accessToken: 'signed-token', refreshToken: 'signed-token' });
   });
 
+  it('signs each refresh token with a unique jti, so two logins in the same second never collide on tokenHash', async () => {
+    // Regression test: without a per-call jti, two issueTokens() calls within the
+    // same second (JWT's iat has 1s resolution) sign byte-identical refresh JWTs -
+    // same payload, same iat/exp - which then hash to the same tokenHash and crash
+    // on RefreshToken's unique constraint. Realistic triggers: a double-clicked
+    // login button, a duplicated OAuth callback render, two tabs signing in at once.
+    prisma.user.findFirst.mockResolvedValue({ id: 'u1', email: googleUser.email, orgId: 'org1' });
+
+    await service.loginOrCreateGoogleUser(googleUser);
+    await service.loginOrCreateGoogleUser(googleUser);
+
+    // jwt.sign is called twice per issueTokens (access token, then refresh token) -
+    // the refresh token is always the 2nd call of each pair.
+    const firstRefreshPayload = jwt.sign.mock.calls[1][0];
+    const secondRefreshPayload = jwt.sign.mock.calls[3][0];
+
+    expect(firstRefreshPayload.jti).toEqual(expect.any(String));
+    expect(secondRefreshPayload.jti).toEqual(expect.any(String));
+    expect(firstRefreshPayload.jti).not.toBe(secondRefreshPayload.jti);
+  });
+
   it('auto-provisions a new user into the first org when no existing user matches', async () => {
     prisma.user.findFirst.mockResolvedValue(null);
     prisma.organization.findFirst.mockResolvedValue({ id: 'org1', createdAt: new Date() });

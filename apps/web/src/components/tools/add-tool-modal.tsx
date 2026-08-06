@@ -229,10 +229,13 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
       if (res) {
         setLimits(res);
         setFetchStatus('ok');
-      } else if (!selectedIntegration.hasLimits) {
-        // This provider doesn't expose a spend limit via API (nothing to preview) -
-        // budget cap is entered manually below instead; the key itself is only
-        // actually validated when the integration syncs after the tool is created.
+      } else if (!selectedIntegration.hasLimits || selectedIntegration.limitsOptional) {
+        // Either this provider doesn't expose a spend limit via API at all, or it
+        // does but the underlying resource is optional and this account simply
+        // hasn't configured one (e.g. no GCP Budget set up yet) - either way,
+        // budget cap is entered manually below instead of blocking Connect. The
+        // key itself is only actually validated when the integration syncs after
+        // the tool is created.
         setLimits(null);
         setFetchStatus('ok');
       } else {
@@ -287,10 +290,14 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
     if (!vendor.trim()) { setError('Vendor is required'); return; }
     if (!depts[0]?.id) { setError('Still loading department info - please wait a moment and try again.'); return; }
     if (needsEmail && !emailUser.trim()) { setError('Notification email is required'); return; }
-    if (paymentKind === 'PREPAID' && mode === 'api' && selectedIntegration?.hasLimits && fetchStatus !== 'ok') {
+    if (paymentKind === 'PREPAID' && mode === 'api' && selectedIntegration?.hasLimits && !selectedIntegration.limitsOptional && fetchStatus !== 'ok') {
       setError('Fetch limits from your provider before saving.'); return;
     }
-    if (paymentKind === 'PREPAID' && mode === 'api' && selectedIntegration && !selectedIntegration.hasLimits && !capAmount) {
+    // Manual cap is required whenever no limits were actually returned - either
+    // because the provider has none to fetch at all, or because it does but this
+    // account hasn't configured the underlying optional resource (e.g. no GCP
+    // Budget set up) and fetchLimits() already fell back to manual entry above.
+    if (paymentKind === 'PREPAID' && mode === 'api' && selectedIntegration && !limits && !capAmount) {
       setError('Budget cap is required.'); return;
     }
     if (mode === 'manual' && paymentKind === 'PREPAID' && !capAmount) {
@@ -563,10 +570,12 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
                       <LimitTile label="Alert at" main={`${limits.alertThresholdPct}% of cap`} sub={`$${limits.computeSoftLimitUSD.toLocaleString('en-US')}`} />
                     </div>
                   )}
-                  {fetchStatus === 'ok' && !limits && !selectedIntegration.hasLimits && (
+                  {fetchStatus === 'ok' && !limits && (!selectedIntegration.hasLimits || selectedIntegration.limitsOptional) && (
                     <div style={{ marginTop: 12 }}>
                       <div style={{ fontSize: 10.5, color: '#3d4250', marginBottom: 8 }}>
-                        {selectedIntegration.label} doesn't expose a spend limit via API - enter your budget manually.
+                        {selectedIntegration.limitsOptional
+                          ? `No budget found on your ${selectedIntegration.label} account - enter one manually below, or configure one there to auto-fill this next time.`
+                          : `${selectedIntegration.label} doesn't expose a spend limit via API - enter your budget manually.`}
                       </div>
                       <div style={S.row2}>
                         <div>

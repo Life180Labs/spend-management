@@ -27,6 +27,15 @@ export interface IntegrationProviderMeta {
    * provider's synced amount is shown, it must read as "delayed," never "Live",
    * so it's never confused with a truly real-time sync. */
   hasLag?: boolean;
+  /** Only meaningful when hasLimits is true. For most hasLimits providers (e.g.
+   * Railway) a null fetchLimitsUSD result means something's actually broken
+   * (bad token, wrong scope) - Connect should block until it succeeds. For a
+   * provider whose limit-reading depends on a genuinely optional resource the
+   * account may just not have set up yet (e.g. GCP's Budget - a separate,
+   * optional Console resource, unlike Railway's near-universal usage limits),
+   * a null result is a normal, expected state, not an error - Connect should
+   * fall back to manual cap entry instead of hard-blocking. */
+  limitsOptional?: boolean;
 }
 
 // Single source of truth for which integrations/known vendors are supported,
@@ -111,9 +120,15 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderMeta[] = [
     tokenKey: 'serviceAccountJson',
     tokenLabel: 'Service Account JSON Key',
     placeholder: '',
-    helpText: 'GCP Console → BigQuery Billing Export must be enabled first - see docs/gcp-billing-integration-loop-prompt.md',
-    // No live limit-reading API (same reasoning as Claude/HeyGen).
-    hasLimits: false,
+    helpText: 'GCP Console → BigQuery Billing Export must be enabled first, and the service account needs roles/billing.viewer on the billing account to read the configured budget - see docs/gcp-billing-integration-loop-prompt.md',
+    // Reads the configured budget (amount + alert threshold) from the Cloud
+    // Billing Budget API - a different endpoint from the BigQuery export used
+    // for spend, requiring the extra roles/billing.viewer role.
+    hasLimits: true,
+    // Unlike Railway, a GCP Budget is a separate, optional Console resource -
+    // plenty of real accounts won't have one configured. A null result here
+    // must fall back to manual cap entry, not block connecting entirely.
+    limitsOptional: true,
     defaultPaymentKind: 'PREPAID',
     multiField: true,
     // BigQuery Billing Export is a daily batch, hours-to-5-days behind - never
