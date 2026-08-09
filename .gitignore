@@ -70,3 +70,9 @@ redis-data/
 *.key
 *.pfx
 *.p12
+
+# ── One-off diagnostic/verification scripts (prefix _tmp-) ─────────────
+# Safety net for scratch scripts that sometimes touch real credentials
+# during debugging (e.g. reading a stored service account key from the DB) -
+# meant to be deleted right after use, this just guards against forgetting to.
+**/scripts/_tmp-*
