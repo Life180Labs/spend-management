@@ -9,7 +9,10 @@ import { exportSpendAnalysis, exportBillingHistory } from '@/lib/excel';
 interface CategoryData { category: string; total: number; pct: number; }
 interface BillingRecord {
   id: string; monthKey: string; monthLabel: string; amount: number; status: string;
-  tool: { name: string; monoInitials: string; monoBgColor: string; category: string } | null;
+  tool: {
+    name: string; monoInitials: string; monoBgColor: string; category: string;
+    billingCycle: string; renewalDate: string | null;
+  } | null;
 }
 
 type Period = 'current' | 'last' | 'quarter' | 'ytd' | 'custom';
@@ -64,6 +67,38 @@ function periodRangeLabel(period: Period, customFrom: string, customTo: string):
   }
   if (period === 'ytd') return `Jan – ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
   return `${monthKeyToLabel(customFrom)} – ${monthKeyToLabel(customTo)}`;
+}
+
+// Actual start/end Date objects for the selected period, for the Excel export's
+// Start Date / End Date rows. An in-progress period (current month, this
+// quarter, YTD, or a custom range ending in the current month) ends "today" -
+// not the calendar month-end - since there's no data beyond today yet; a fully
+// closed period (last month, or a custom range ending before this month) ends
+// on that period's actual last day.
+function periodDateRange(period: Period, customFrom: string, customTo: string): { start: Date; end: Date } {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (period === 'current') return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: today };
+  if (period === 'last') {
+    const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    const m = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    return { start: new Date(y, m, 1), end: new Date(y, m + 1, 0) };
+  }
+  if (period === 'quarter') {
+    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+    return { start: new Date(now.getFullYear(), quarterStartMonth, 1), end: today };
+  }
+  if (period === 'ytd') return { start: new Date(now.getFullYear(), 0, 1), end: today };
+
+  // custom
+  const [fy, fm] = customFrom.split('-').map(Number);
+  const [ty, tm] = customTo.split('-').map(Number);
+  const isOngoingMonth = customTo === monthKeyNMonthsAgo(0);
+  return {
+    start: new Date(fy, fm - 1, 1),
+    end: isOngoingMonth ? today : new Date(ty, tm, 0),
+  };
 }
 
 const CAT_LABELS: Record<string, string> = {
@@ -142,8 +177,12 @@ export default function ReportsPage() {
         <DownloadBtn
           onClick={() => {
             if (tab === 'spend') {
-              exportSpendAnalysis(categories, reportStats, currency, fxRate);
+              const { start, end } = periodDateRange(period, customFrom, customTo);
+              exportSpendAnalysis(categories, reportStats, currency, fxRate, start, end);
             } else {
+              // Billing History computes each row's own Start/End Date from its
+              // tool's renewal day, not a single report-level range - see
+              // billingRowPeriod() in excel.ts.
               exportBillingHistory(filteredBilling, periodLabel, currency, fxRate, periodRangeLabel(period, customFrom, customTo));
             }
           }}

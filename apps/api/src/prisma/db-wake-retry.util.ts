@@ -16,7 +16,14 @@ export async function waitForDatabaseAwake(
   prisma: PrismaService,
   label: string,
   logger: Logger,
-  maxAttempts = 6, // ~2+4+6+8+10s = 30s total before giving up
+  // ~2+4+6+6+6+6+6+6+6+6+6s = 60s total before giving up. Was 6 attempts/30s,
+  // which in practice wasn't always enough for Railway Postgres's real cold-start
+  // time (observed: first sign-in attempt exhausted the 30s budget and failed,
+  // an immediate second attempt then succeeded instantly - Postgres was awake by
+  // then, our window just wasn't long enough). Capping each step at 6s (rather
+  // than letting it grow to 10s+) also means more attempts land within the
+  // budget, giving a better chance of catching the DB right when it wakes.
+  maxAttempts = 12,
 ): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -32,7 +39,7 @@ export async function waitForDatabaseAwake(
         logger.error(`${label}: database still unreachable after ${maxAttempts} attempts`);
         throw err;
       }
-      const delayMs = attempt * 2000;
+      const delayMs = Math.min(attempt * 2000, 6000);
       logger.warn(`${label}: database unreachable (attempt ${attempt}/${maxAttempts}), likely waking from Serverless sleep - retrying in ${delayMs}ms`);
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }

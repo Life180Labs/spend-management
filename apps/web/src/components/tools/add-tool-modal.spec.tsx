@@ -86,6 +86,55 @@ describe('AddToolModal', () => {
     expect(railwayOption.disabled).toBe(false);
   });
 
+  it('edit mode: Name is an editable input (not a locked display), pre-filled and saved in the PATCH payload', async () => {
+    (api.get as jest.Mock).mockResolvedValue([{ id: 'dept1' }]);
+    (api.patch as jest.Mock).mockResolvedValue({});
+    const user = userEvent.setup();
+    const onCreated = jest.fn();
+
+    const tool = {
+      id: 'tool1', name: 'ChatGPT', vendor: 'OpenAI', category: 'AI_LLM',
+      paymentKind: 'MOSUB', billingCycle: 'MONTHLY', capAmount: 0, monthlyAmount: 20,
+      alertThresholdPct: 80, triggerEmail: 'admin', renewalDate: null,
+    };
+
+    render(<AddToolModal onClose={jest.fn()} onCreated={onCreated} tool={tool} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save changes' })).not.toBeDisabled());
+
+    const nameInput = screen.getByDisplayValue('ChatGPT');
+    expect(nameInput.tagName).toBe('INPUT'); // editable, not a locked read-only div
+
+    await user.clear(nameInput);
+    await user.type(nameInput, 'ChatGPT Plus');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(api.patch).toHaveBeenCalledWith('/tools/tool1', expect.objectContaining({
+      name: 'ChatGPT Plus',
+    })));
+    expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ name: 'ChatGPT Plus' }));
+  });
+
+  it('edit mode: blocks saving an empty Name rather than sending a blank rename', async () => {
+    (api.get as jest.Mock).mockResolvedValue([{ id: 'dept1' }]);
+    const user = userEvent.setup();
+
+    const tool = {
+      id: 'tool1', name: 'ChatGPT', vendor: 'OpenAI', category: 'AI_LLM',
+      paymentKind: 'MOSUB', billingCycle: 'MONTHLY', capAmount: 0, monthlyAmount: 20,
+      alertThresholdPct: 80, triggerEmail: 'admin', renewalDate: null,
+    };
+
+    render(<AddToolModal onClose={jest.fn()} onCreated={jest.fn()} tool={tool} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save changes' })).not.toBeDisabled());
+
+    const nameInput = screen.getByDisplayValue('ChatGPT');
+    await user.clear(nameInput);
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(await screen.findByText('Tool name is required')).toBeInTheDocument();
+    expect(api.patch).not.toHaveBeenCalled();
+  });
+
   it('GCP: renders the multi-field connect form instead of a single API key input, Connect stays disabled until all 5 fields are filled', async () => {
     (api.get as jest.Mock).mockResolvedValue([{ id: 'dept1' }]);
     const user = userEvent.setup();

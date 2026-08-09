@@ -1,5 +1,17 @@
 import * as XLSX from 'xlsx';
 
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// dd/mmm/yyyy (e.g. "09/Aug/2026") - the format requested for the report's
+// covered date range, distinct from the locale-formatted dates used elsewhere
+// in this file (e.g. Renewal Date's toLocaleDateString) so it stays exactly
+// this shape regardless of the browser's locale settings.
+function fmtDDMMMYYYY(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mmm = MONTH_ABBR[d.getMonth()];
+  return `${dd}/${mmm}/${d.getFullYear()}`;
+}
+
 function download(wb: XLSX.WorkBook, filename: string) {
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
@@ -32,6 +44,8 @@ export function exportSpendAnalysis(
   stats: ReportStat[],
   currency: 'INR' | 'USD',
   fxRate: number,
+  startDate: Date,
+  endDate: Date,
 ) {
   const fmt = (n: number) =>
     currency === 'USD'
@@ -39,7 +53,11 @@ export function exportSpendAnalysis(
       : (n * fxRate).toLocaleString('en-IN', { maximumFractionDigits: 2 });
   const sym = currency === 'USD' ? '$' : '₹';
 
-  const summaryData = stats.map((s) => ({ Metric: s.label, Value: s.value }));
+  const summaryData = [
+    { Metric: 'Start Date', Value: fmtDDMMMYYYY(startDate) },
+    { Metric: 'End Date', Value: fmtDDMMMYYYY(endDate) },
+    ...stats.map((s) => ({ Metric: s.label, Value: s.value })),
+  ];
   const summaryWs = sheet(summaryData);
   autoWidth(summaryWs, summaryData);
 
@@ -63,10 +81,48 @@ export function exportSpendAnalysis(
 
 interface BillingRow {
   id: string;
-  tool: { name: string; category: string } | null;
+  tool: { name: string; category: string; billingCycle: string; renewalDate: string | null } | null;
+  monthKey: string;
   monthLabel: string;
   amount: number;
   status: string;
+}
+
+// This row's actual billing-cycle start/end, anchored to the tool's renewal
+// cycle rather than calendar-month boundaries (e.g. "renews on the 18th" means
+// the cycle covering early August actually runs 18 Jul - 17 Aug, not 1-31 Aug).
+// Applies to any tool with a renewalDate set, regardless of payment kind -
+// a tool with no renewalDate at all falls back to the calendar month instead.
+//
+// For a LIVE row (still accruing, "live-" id), the tool's CURRENT renewalDate
+// already points at the boundary this cycle is heading toward -
+// rollForwardRenewalDates keeps it in the future, so "today" always falls
+// inside [boundary - cycleLength, boundary). For a closed HISTORICAL row, that
+// boundary has to be reconstructed instead: the renewal day-of-month is stable
+// across cycles (rollForwardRenewalDates preserves it when advancing), so
+// combining that day with the row's OWN month/year reconstructs the exact date
+// this specific cycle ended on.
+function billingRowPeriod(r: BillingRow): { start: Date; end: Date } {
+  const [y, m] = r.monthKey.split('-').map(Number); // m is 1-indexed
+  const isLive = r.id.startsWith('live-');
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const renewalDate = r.tool?.renewalDate ? new Date(r.tool.renewalDate) : null;
+
+  if (!renewalDate) {
+    const start = new Date(y, m - 1, 1);
+    const end = isLive ? today : new Date(y, m, 0); // last calendar day of the month
+    return { start, end };
+  }
+
+  const cycleMonths = r.tool?.billingCycle === 'YEARLY' ? 12 : 1;
+  const boundary = isLive ? renewalDate : new Date(y, m - 1, renewalDate.getDate());
+
+  const cycleEnd = new Date(boundary.getFullYear(), boundary.getMonth(), boundary.getDate() - 1);
+  const cycleStart = new Date(boundary.getFullYear(), boundary.getMonth() - cycleMonths, boundary.getDate());
+  const end = isLive && cycleEnd > today ? today : cycleEnd;
+  return { start: cycleStart, end };
 }
 
 export function exportBillingHistory(
@@ -86,18 +142,23 @@ export function exportBillingHistory(
       : (n * fxRate).toLocaleString('en-IN', { maximumFractionDigits: 2 });
   const sym = currency === 'USD' ? '$' : '₹';
 
-  const data = rows.map((r) => ({
-    Tool: r.tool?.name || 'Deleted tool',
-    Category: CAT_LABELS[r.tool?.category || ''] || r.tool?.category || '-',
-    Period: periodRangeLabel ?? r.monthLabel,
-    [`Amount (${sym})`]: fmt(r.amount),
-    // Same status labeling as the Billing History table on-screen: a live
-    // synthesized current-month row (id starts with "live-") reads "In
-    // progress," not the more final-sounding "Pending" a closed, unpaid
-    // historical month gets - otherwise the export disagrees with what the
-    // user just saw on screen for the exact same rows.
-    Status: r.status === 'PAID' ? 'Paid' : r.id.startsWith('live-') ? 'In progress' : 'Pending',
-  }));
+  const data = rows.map((r) => {
+    const { start, end } = billingRowPeriod(r);
+    return {
+      Tool: r.tool?.name || 'Deleted tool',
+      Category: CAT_LABELS[r.tool?.category || ''] || r.tool?.category || '-',
+      Period: periodRangeLabel ?? r.monthLabel,
+      'Start Date': fmtDDMMMYYYY(start),
+      'End Date': fmtDDMMMYYYY(end),
+      [`Amount (${sym})`]: fmt(r.amount),
+      // Same status labeling as the Billing History table on-screen: a live
+      // synthesized current-month row (id starts with "live-") reads "In
+      // progress," not the more final-sounding "Pending" a closed, unpaid
+      // historical month gets - otherwise the export disagrees with what the
+      // user just saw on screen for the exact same rows.
+      Status: r.status === 'PAID' ? 'Paid' : r.id.startsWith('live-') ? 'In progress' : 'Pending',
+    };
+  });
 
   const ws = sheet(data);
   autoWidth(ws, data);

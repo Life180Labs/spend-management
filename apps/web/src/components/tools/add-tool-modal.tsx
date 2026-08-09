@@ -271,15 +271,17 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
     const needsEmail = paymentKind !== 'NOBUDGET';
 
     if (isEdit) {
+      if (!name.trim()) { setError('Tool name is required'); return; }
       if (needsEmail && !emailUser.trim()) { setError('Notification email is required'); return; }
       setError(''); setLoading(true);
       try {
         await api.patch<any>(`/tools/${tool!.id}`, {
+          name: name.trim(),
           category,
           triggerEmail: needsEmail ? `${emailUser.trim()}@life180labs.com` : undefined,
           renewalDate: renewalDate ? new Date(renewalDate).toISOString() : undefined,
         });
-        onCreated({ ...tool, category, triggerEmail: needsEmail ? `${emailUser.trim()}@life180labs.com` : undefined, renewalDate });
+        onCreated({ ...tool, name: name.trim(), category, triggerEmail: needsEmail ? `${emailUser.trim()}@life180labs.com` : undefined, renewalDate });
       } catch (err: any) {
         setError(err.message || 'Something went wrong. Please try again.');
       } finally { setLoading(false); }
@@ -407,12 +409,8 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
             <div style={{ ...S.row2, marginBottom: 12 }}>
               <div>
                 <label style={S.label}>Name</label>
-                {isEdit ? (
-                  <div style={S.lockedInput}>{name}</div>
-                ) : (
-                  <input value={name} onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. ChatGPT" required style={S.input} />
-                )}
+                <input value={name} onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. ChatGPT" required style={S.input} />
               </div>
               <div>
                 <label style={S.label}>Vendor</label>

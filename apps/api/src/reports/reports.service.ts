@@ -29,7 +29,20 @@ export interface SpendRow {
   monthLabel: string;
   amount: number;
   status: 'PAID' | 'PENDING';
-  tool: { name: string; monoInitials: string; monoBgColor: string; category: string } | null;
+  tool: {
+    name: string; monoInitials: string; monoBgColor: string; category: string;
+    // "MONTHLY" or "YEARLY" - the billing cycle length used to anchor a row's
+    // Start/End Date to its renewal date (see excel.ts's billingRowPeriod),
+    // for any tool that has a renewalDate set, regardless of payment kind.
+    billingCycle: string;
+    // The tool's CURRENT renewal date - rollForwardRenewalDates advances this
+    // to the next upcoming cycle after each one completes, so for a historical
+    // row this is a stand-in for "which day of the month this tool bills on,"
+    // not literally that row's own renewal date (see excel.ts's
+    // billingRowPeriod for the full reconstruction). Null for a deleted tool
+    // (not captured in toolSnapshotJson) or a tool with no renewal date set.
+    renewalDate: Date | null;
+  } | null;
 }
 
 @Injectable()
@@ -50,6 +63,7 @@ export class ReportsService {
       select: {
         id: true, name: true, category: true, monoInitials: true,
         monoBgColor: true, paymentKind: true, billingCycle: true, usedAmount: true, monthlyAmount: true,
+        renewalDate: true,
       },
     });
 
@@ -68,6 +82,8 @@ export class ReportsService {
             monoInitials: t.monoInitials,
             monoBgColor: t.monoBgColor,
             category: t.category,
+            billingCycle: t.billingCycle,
+            renewalDate: t.renewalDate,
           },
         };
       })
@@ -92,9 +108,11 @@ export class ReportsService {
         monthLabel: r.monthLabel,
         amount: r.amount,
         status: r.status as 'PAID' | 'PENDING',
+        // billingCycle/renewalDate aren't selected/needed here - this branch only
+        // feeds the category rollup, never the per-row billing export (see billingHistory()).
         tool: r.tool
-          ? { name: r.tool.name, monoInitials: r.tool.monoInitials, monoBgColor: r.tool.monoBgColor, category: r.tool.category }
-          : { name: (r.toolSnapshotJson as any)?.name || 'Deleted tool', monoInitials: '?', monoBgColor: '#5E6AD2', category: (r.toolSnapshotJson as any)?.category || 'OTHER' },
+          ? { name: r.tool.name, monoInitials: r.tool.monoInitials, monoBgColor: r.tool.monoBgColor, category: r.tool.category, billingCycle: 'MONTHLY', renewalDate: null }
+          : { name: (r.toolSnapshotJson as any)?.name || 'Deleted tool', monoInitials: '?', monoBgColor: '#5E6AD2', category: (r.toolSnapshotJson as any)?.category || 'OTHER', billingCycle: 'MONTHLY', renewalDate: null },
       }));
     }
 
@@ -155,7 +173,11 @@ export class ReportsService {
 
     const dbRecords = await this.prisma.billingRecord.findMany({
       where: { orgId, monthKey: { not: currentMonth } },
-      include: { tool: { select: { name: true, monoInitials: true, monoBgColor: true, category: true } } },
+      include: {
+        tool: {
+          select: { name: true, monoInitials: true, monoBgColor: true, category: true, billingCycle: true, renewalDate: true },
+        },
+      },
       orderBy: [{ monthKey: 'desc' }],
     });
 
@@ -167,8 +189,16 @@ export class ReportsService {
       amount: r.amount,
       status: r.status as 'PAID' | 'PENDING',
       tool: r.tool
-        ? { name: r.tool.name, monoInitials: r.tool.monoInitials, monoBgColor: r.tool.monoBgColor, category: r.tool.category }
-        : { name: (r.toolSnapshotJson as any)?.name || 'Deleted tool', monoInitials: '?', monoBgColor: '#5E6AD2', category: (r.toolSnapshotJson as any)?.category || 'OTHER' },
+        ? {
+          name: r.tool.name, monoInitials: r.tool.monoInitials, monoBgColor: r.tool.monoBgColor, category: r.tool.category,
+          billingCycle: r.tool.billingCycle, renewalDate: r.tool.renewalDate,
+        }
+        // toolSnapshotJson doesn't capture billingCycle/renewalDate - fall back to
+        // the calendar month for a deleted tool rather than guessing its cycle.
+        : {
+          name: (r.toolSnapshotJson as any)?.name || 'Deleted tool', monoInitials: '?', monoBgColor: '#5E6AD2',
+          category: (r.toolSnapshotJson as any)?.category || 'OTHER', billingCycle: 'MONTHLY', renewalDate: null,
+        },
     }));
 
     let all = [...live, ...historical];

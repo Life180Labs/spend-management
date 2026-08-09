@@ -56,4 +56,23 @@ describe('waitForDatabaseAwake', () => {
     await expect(waitForDatabaseAwake(prisma, 'test-caller', logger)).rejects.toBe(otherErr);
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
+
+  it('caps the backoff delay at 6s per step and defaults to 12 attempts (~60s total) rather than giving up too early', async () => {
+    // Regression: 6 attempts/30s wasn't always enough for Railway Postgres's real
+    // cold-start time in practice (a sign-in attempt exhausted the old 30s budget
+    // and failed, then an immediate retry succeeded instantly - Postgres was
+    // awake by then). This locks in the wider window and the per-step cap.
+    prisma.$queryRaw.mockRejectedValue(connErr);
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+
+    const p = waitForDatabaseAwake(prisma, 'test-caller', logger, 12);
+    const assertion = expect(p).rejects.toBe(connErr);
+    await jest.runAllTimersAsync();
+    await assertion;
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(12);
+    const delays = setTimeoutSpy.mock.calls.map((call) => call[1]);
+    expect(delays).toEqual([2000, 4000, 6000, 6000, 6000, 6000, 6000, 6000, 6000, 6000, 6000]);
+    expect(delays.reduce((sum: number, d: any) => sum + d, 0)).toBe(60000);
+  });
 });
