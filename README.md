@@ -7,7 +7,7 @@ An internal SaaS platform for tracking and managing AI tool spend across an orga
 - **Tool registry** - add every AI/cloud tool the team uses, with payment type (usage-based, subscription, or no budget)
 - **Budget tracking** - set spend caps and alert thresholds; usage synced automatically from connected providers
 - **Automated alerts** - email notifications when a tool breaches its threshold, and renewal reminders before subscription dates
-- **Provider integrations** - connect accounts via API key (Railway supported; more providers planned) to pull live usage limits
+- **Provider integrations** - connect accounts via API key or service account to sync live spend and (where available) usage limits: Railway, Claude (Anthropic), HeyGen, and Google Cloud Platform
 - **Spend reports** - monthly summaries with export to spreadsheet
 - **INR / USD toggle** - live FX rate via Frankfurter (ECB), user preference persisted across sessions
 
@@ -108,19 +108,44 @@ pnpm dev        # runs on http://localhost:3000
 
 | Job | Schedule | Description |
 |---|---|---|
-| Integration sync | Every 15 min | Pulls latest usage from connected provider APIs |
-| Threshold alerts | Every 5 min | Sends email if a tool's usage has breached its alert % (deduplicated - one email per tool per 24 h) |
-| Renewal reminders | Daily at 9 AM | Emails if a subscription renews within the next 5 days |
+| Integration sync | Hourly | Pulls latest usage from connected provider APIs |
+| Threshold alerts | Hourly | Sends one consolidated email per recipient if any of their tools has breached its alert % (deduplicated - won't re-send for the same tool within 24 h) |
+| Renewal reminders | Daily at 9:00 AM | Emails if a subscription renews within the next 5 days |
+| Roll forward renewal dates | Daily at 9:10 AM | Advances a subscription's renewal date past any completed cycles, auto-logging each one to Billing History |
+| Record completed-month usage billing | Monthly, 00:20 on the 1st | Closes out last month's actual spend for usage-based tools with a live integration, logging it to Billing History |
+
+All five run in-process via `@nestjs/schedule` and share a DB-wake retry (`apps/api/src/prisma/db-wake-retry.util.ts`) that probes Postgres and backs off for up to ~60s before giving up on a run - handles Postgres being asleep if it's deployed on a platform with serverless/scale-to-zero database instances (e.g. Railway). Set `DISABLE_INPROCESS_SCHEDULER=true` on any deployment where these are instead triggered externally (see `apps/api/scripts/run-scheduled-job.ts`).
 
 ## Provider integrations
 
+New providers register in `apps/api/src/integrations/integration-runner.service.ts` (backend) and `apps/web/src/lib/integration-providers.ts` (frontend) - both are single sources of truth shared across the Add Tool and Configure Integration modals.
+
 ### Railway
 
-Connect a tool to Railway to have budget cap and alert threshold pulled automatically from your Railway workspace limits.
+1. Go to **railway.com → Account Settings → API Tokens** and create one **scoped to your workspace** (not "No workspace" - an account-scoped token can't read budget limits or usage history, only a bare current-spend number)
+2. Add a tool with payment type **Usage-based**, choose **Connect account**, and paste the token
+3. Budget cap and alert threshold are pulled automatically from Railway's own workspace usage limits (`computeHardLimit`/`computeSoftLimit`) via the Railway GraphQL API
 
-1. Go to **railway.com → Account Settings → Tokens → New Token**
-2. Add a tool with payment type **Pre-paid**, choose **Connect account**, and paste the token
-3. The platform fetches `computeHardLimit` (cap) and `computeSoftLimit` (alert threshold) via the Railway GraphQL API
+### Claude (Anthropic)
+
+1. Go to **console.anthropic.com → Settings → Admin Keys** and create an Admin API key
+2. Add a tool with payment type **Usage-based**, choose **Connect account**, and paste the key
+3. Syncs current-month spend from the Anthropic Admin API. No live limit-reading endpoint exists - budget cap and alert threshold are always entered manually
+
+### HeyGen
+
+1. Go to **app.heygen.com → Settings → API Keys**
+2. Add a tool with payment type **Usage-based**, choose **Connect account**, and paste the key
+3. HeyGen reports a remaining prepaid wallet balance rather than a spend total - the tool displays as a **Wallet** and tracks balance deltas across syncs. No live limit-reading endpoint; budget cap is entered manually
+
+### Google Cloud Platform
+
+Cost data comes from **BigQuery Billing Export**, a daily batch table (hours-to-5-days lag) - GCP has no live "current spend" API. Full setup: `docs/gcp-billing-integration-loop-prompt.md`.
+
+1. Enable BigQuery Billing Export ("Standard usage cost") in the GCP Console for your billing account
+2. Create a service account with `roles/bigquery.dataViewer` (scoped to the export dataset) and `roles/bigquery.jobUser` (on the hosting project), and download its JSON key
+3. Optional: to also auto-read your configured GCP Budget as the cap instead of entering one manually, additionally grant `roles/billing.viewer` on the billing account and enable the `billingbudgets.googleapis.com` API - if you skip this, or the account has no Budget configured, the cap falls back to manual entry
+4. Add a tool with payment type **Usage-based**, choose **Connect account**, and fill in the Billing Account ID, GCP Project ID, Dataset ID, Table Name, and the service account JSON key
 
 ## Email setup (custom domain)
 
