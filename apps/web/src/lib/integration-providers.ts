@@ -84,6 +84,23 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderMeta[] = [
     defaultBillingCycle: 'YEARLY',
   },
   {
+    // No IntegrationProvider - Hostinger's Billing API reports subscription
+    // status/renewal metadata, not a verified per-subscription cost figure
+    // (see docs/hostinger-integration-loop-prompt.md Step 0). Manual entry
+    // only, same as Namecheap/Google Workspace.
+    value: 'HOSTINGER',
+    label: 'Hostinger',
+    vendor: 'Hostinger',
+    hasApi: false,
+    tokenKey: '',
+    tokenLabel: '',
+    placeholder: '',
+    helpText: '',
+    hasLimits: false,
+    defaultPaymentKind: 'MOSUB',
+    defaultBillingCycle: 'MONTHLY',
+  },
+  {
     value: 'GOOGLE_WORKSPACE',
     label: 'Google Workspace',
     vendor: 'Google Workspace',

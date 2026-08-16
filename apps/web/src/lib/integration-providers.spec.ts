@@ -18,9 +18,10 @@ describe('matchProviderByVendor', () => {
     expect(result?.value).toBe('RAILWAY');
   });
 
-  it('matches Namecheap and Google Workspace (non-API vendors) the same way as API vendors', () => {
+  it('matches Namecheap, Google Workspace, and Hostinger (non-API vendors) the same way as API vendors', () => {
     expect(matchProviderByVendor('Namecheap')?.value).toBe('NAMECHEAP');
     expect(matchProviderByVendor('Google Workspace')?.value).toBe('GOOGLE_WORKSPACE');
+    expect(matchProviderByVendor('Hostinger')?.value).toBe('HOSTINGER');
   });
 
   it('returns undefined for a vendor that does not match any known provider', () => {
@@ -34,11 +35,13 @@ describe('INTEGRATION_PROVIDERS', () => {
     expect(new Set(values).size).toBe(values.length);
   });
 
-  it('marks Namecheap and Google Workspace as hasApi: false (no live sync implied)', () => {
+  it('marks Namecheap, Google Workspace, and Hostinger as hasApi: false (no live sync implied)', () => {
     const namecheap = INTEGRATION_PROVIDERS.find((p) => p.value === 'NAMECHEAP')!;
     const gws = INTEGRATION_PROVIDERS.find((p) => p.value === 'GOOGLE_WORKSPACE')!;
+    const hostinger = INTEGRATION_PROVIDERS.find((p) => p.value === 'HOSTINGER')!;
     expect(namecheap.hasApi).toBe(false);
     expect(gws.hasApi).toBe(false);
+    expect(hostinger.hasApi).toBe(false);
   });
 
   it('marks Railway and Claude as hasApi: true', () => {
@@ -48,11 +51,13 @@ describe('INTEGRATION_PROVIDERS', () => {
     expect(claude.hasApi).toBe(true);
   });
 
-  it('gives Namecheap a YEARLY default billing cycle and Google Workspace a MONTHLY one', () => {
+  it('gives Namecheap a YEARLY default billing cycle, Google Workspace and Hostinger a MONTHLY one', () => {
     const namecheap = INTEGRATION_PROVIDERS.find((p) => p.value === 'NAMECHEAP')!;
     const gws = INTEGRATION_PROVIDERS.find((p) => p.value === 'GOOGLE_WORKSPACE')!;
+    const hostinger = INTEGRATION_PROVIDERS.find((p) => p.value === 'HOSTINGER')!;
     expect(namecheap.defaultBillingCycle).toBe('YEARLY');
     expect(gws.defaultBillingCycle).toBe('MONTHLY');
+    expect(hostinger.defaultBillingCycle).toBe('MONTHLY');
   });
 
   it('marks GCP as multiField (needs a service account JSON + several IDs, not one token) and hasLag (batch export, never "Live")', () => {
