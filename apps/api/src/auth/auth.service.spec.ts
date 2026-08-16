@@ -1,5 +1,5 @@
 import { UnauthorizedException } from '@nestjs/common';
-import { AuthService } from './auth.service';
+import { AuthService, DatabaseUnavailableError } from './auth.service';
 
 describe('AuthService.loginOrCreateGoogleUser', () => {
   let prisma: any;
@@ -88,30 +88,71 @@ describe('AuthService.loginOrCreateGoogleUser', () => {
   describe('Postgres Serverless wake-up handling', () => {
     const connErr = Object.assign(new Error("Can't reach database server at `x:5432`"), { code: 'P1001' });
 
-    it('retries the DB probe with backoff, then proceeds normally once Postgres wakes up', async () => {
-      prisma.$queryRaw
-        .mockRejectedValueOnce(connErr)
-        .mockRejectedValueOnce(connErr)
-        .mockResolvedValueOnce([{ '?column?': 1 }]);
-      prisma.user.findFirst.mockResolvedValue({ id: 'u1', email: googleUser.email, orgId: 'org1' });
-
-      const run = service.loginOrCreateGoogleUser(googleUser);
-      await jest.runAllTimersAsync();
-      const tokens = await run;
-
-      expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
-      expect(tokens).toEqual({ accessToken: 'signed-token', refreshToken: 'signed-token' });
-    });
-
-    it('surfaces a friendly error (not a raw Prisma error) once retries are exhausted', async () => {
+    // No inline retry anymore - loginOrCreateGoogleUser probes exactly once and
+    // throws immediately on a connection error. Retrying across multiple SHORT,
+    // separate requests (not one held-open request) is now the caller's job -
+    // see completeGoogleSignIn() below and auth.controller.ts's googleCallback -
+    // because a single request retried for up to a minute is fragile against
+    // any upstream proxy/gateway timeout shorter than that.
+    it('throws DatabaseUnavailableError immediately on a connection error, without retrying inline', async () => {
       prisma.$queryRaw.mockRejectedValue(connErr);
 
-      const run = service.loginOrCreateGoogleUser(googleUser);
-      const assertion = expect(run).rejects.toThrow('Sign-in is temporarily unavailable - please try again in a moment.');
-      await jest.runAllTimersAsync();
-      await assertion;
+      await expect(service.loginOrCreateGoogleUser(googleUser)).rejects.toThrow(DatabaseUnavailableError);
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.user.findFirst).not.toHaveBeenCalled();
+    });
 
-      expect(prisma.user.findFirst).not.toHaveBeenCalled(); // never got to the real lookup
+    it('succeeds normally when the DB probe succeeds on the first try', async () => {
+      prisma.user.findFirst.mockResolvedValue({ id: 'u1', email: googleUser.email, orgId: 'org1' });
+
+      const tokens = await service.loginOrCreateGoogleUser(googleUser);
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(tokens).toEqual({ accessToken: 'signed-token', refreshToken: 'signed-token' });
+    });
+  });
+
+  describe('pending Google sign-in (the DB-unavailable retry path)', () => {
+    const connErr = Object.assign(new Error("Can't reach database server at `x:5432`"), { code: 'P1001' });
+    const pendingPayload = { type: 'pending_google_profile', ...googleUser };
+
+    it('signs a short-lived token carrying the Google profile', () => {
+      service.signPendingGoogleProfile(googleUser);
+
+      expect(jwt.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'pending_google_profile', email: googleUser.email, googleId: googleUser.googleId }),
+        { expiresIn: '15m' },
+      );
+    });
+
+    it('returns { ready: false } - never a thrown error - while the DB is still unreachable, so the frontend never shows an error for this case', async () => {
+      jwt.verify = jest.fn().mockReturnValue(pendingPayload);
+      prisma.$queryRaw.mockRejectedValue(connErr);
+
+      const result = await service.completeGoogleSignIn('pending-token');
+
+      expect(result).toEqual({ ready: false });
+    });
+
+    it('returns real tokens once Postgres is reachable again', async () => {
+      jwt.verify = jest.fn().mockReturnValue(pendingPayload);
+      prisma.user.findFirst.mockResolvedValue({ id: 'u1', email: googleUser.email, orgId: 'org1' });
+
+      const result = await service.completeGoogleSignIn('pending-token');
+
+      expect(result).toEqual({ ready: true, accessToken: 'signed-token', refreshToken: 'signed-token' });
+    });
+
+    it('throws a real, final error for an expired/invalid pending token, rather than polling forever', async () => {
+      jwt.verify = jest.fn().mockImplementation(() => { throw new Error('jwt expired'); });
+
+      await expect(service.completeGoogleSignIn('bad-token')).rejects.toThrow('This sign-in attempt has expired');
+    });
+
+    it('throws if the token decodes but is not actually a pending-profile token (e.g. a real access token passed here by mistake)', async () => {
+      jwt.verify = jest.fn().mockReturnValue({ sub: 'someone', email: 'x@y.com' });
+
+      await expect(service.completeGoogleSignIn('not-a-pending-token')).rejects.toThrow('Invalid sign-in token');
     });
   });
 });

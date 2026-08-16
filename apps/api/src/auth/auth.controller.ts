@@ -5,10 +5,11 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
-import { AuthService } from './auth.service';
+import { AuthService, DatabaseUnavailableError } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { CompleteGoogleSignInDto } from './dto/complete-google-signin.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
@@ -59,8 +60,24 @@ export class AuthController {
         `${frontendUrl}/callback?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`,
       );
     } catch (err: any) {
+      if (err instanceof DatabaseUnavailableError) {
+        // Google's auth code is single-use and already spent - can't retry the
+        // OAuth handshake itself. Hand the browser a pending-sign-in token
+        // instead and send it back to /login, which shows "Finishing sign-in…"
+        // and polls completeGoogleSignIn() until Postgres is reachable - no
+        // error is ever shown to the user for this case.
+        const pending = this.auth.signPendingGoogleProfile(req.user);
+        res.redirect(`${frontendUrl}/login?pending=${pending}`);
+        return;
+      }
       const msg = encodeURIComponent(err.message || 'Access denied');
       res.redirect(`${frontendUrl}/login?error=${msg}`);
     }
+  }
+
+  @Post('google/complete')
+  @HttpCode(200)
+  completeGoogleSignIn(@Body() dto: CompleteGoogleSignInDto) {
+    return this.auth.completeGoogleSignIn(dto.token);
   }
 }
