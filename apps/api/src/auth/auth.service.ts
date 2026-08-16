@@ -14,6 +14,23 @@ import { waitForDatabaseAwake } from '../prisma/db-wake-retry.util';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 
+// Thrown only for a connection-unreachable DB, never for a real failure
+// (wrong credentials, unauthorized email, etc.) - callers use this to decide
+// "keep the user waiting and retry" vs "this is a genuine, final error."
+export class DatabaseUnavailableError extends Error {
+  constructor() {
+    super('Database is temporarily unreachable');
+  }
+}
+
+interface PendingGoogleProfile {
+  type: 'pending_google_profile'; // distinguishes this from a real access/refresh token payload
+  email: string;
+  name: string;
+  googleId: string;
+  picture?: string;
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -108,6 +125,15 @@ export class AuthService {
     });
   }
 
+  // One-shot: probes the DB exactly once (no inline retry) and either
+  // completes the login or throws DatabaseUnavailableError. Retrying across
+  // multiple *separate* short requests - not one held-open request - is the
+  // caller's job now (see googleCallback/completeGoogleSignIn in
+  // auth.controller.ts): a single HTTP request retried for up to a minute is
+  // fragile against any upstream proxy/gateway timeout shorter than that,
+  // which would kill the connection out from under a long inline retry
+  // regardless of what backoff we pick. Short, repeated, cheap polls have no
+  // such ceiling.
   async loginOrCreateGoogleUser(googleUser: {
     email: string;
     name: string;
@@ -115,21 +141,17 @@ export class AuthService {
     picture?: string;
   }) {
     // Allowlist check - pure config, no DB needed, so this runs before we
-    // even wait on Postgres and fails fast for a genuinely unauthorized email.
+    // even touch Postgres and fails fast for a genuinely unauthorized email.
     const raw = this.config.get<string>('ALLOWED_SSO_EMAILS', '');
     const allowed = raw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
     if (allowed.length > 0 && !allowed.includes(googleUser.email.toLowerCase())) {
       throw new UnauthorizedException(`${googleUser.email} is not authorized to access this workspace`);
     }
 
-    // Postgres can be asleep (Railway Serverless mode on the DB) when this
-    // fires - unlike the background scheduler jobs, someone is actively
-    // waiting on this request, so a still-unreachable DB becomes a friendly
-    // error instead of a raw Prisma stack trace on the login page.
     try {
-      await waitForDatabaseAwake(this.prisma, 'Google sign-in', this.logger);
+      await waitForDatabaseAwake(this.prisma, 'Google sign-in', this.logger, 1);
     } catch {
-      throw new Error('Sign-in is temporarily unavailable - please try again in a moment.');
+      throw new DatabaseUnavailableError();
     }
 
     // Find existing user by email
@@ -187,6 +209,54 @@ export class AuthService {
     }
 
     return this.issueTokens(user.id, user.email, user.orgId);
+  }
+
+  // Carries a Google-verified profile across the "DB was unreachable" gap -
+  // Google's own auth code is single-use and already consumed by this point,
+  // so a retry can't re-run the OAuth handshake; this lets the frontend poll
+  // completeGoogleSignIn() repeatedly without the user re-clicking "Continue
+  // with Google." 15m is a safety net, not a retry budget - long enough to
+  // cover a slow Postgres wake, short enough that a token found in a browser
+  // history/URL bar isn't usable for long (it carries no secret, just
+  // Google-proven identity claims, but still shouldn't linger indefinitely).
+  signPendingGoogleProfile(googleUser: { email: string; name: string; googleId: string; picture?: string }): string {
+    const payload: PendingGoogleProfile = {
+      type: 'pending_google_profile',
+      email: googleUser.email,
+      name: googleUser.name,
+      googleId: googleUser.googleId,
+      picture: googleUser.picture,
+    };
+    return this.jwt.sign(payload, { expiresIn: '15m' });
+  }
+
+  private verifyPendingGoogleProfile(token: string): PendingGoogleProfile {
+    let payload: any;
+    try {
+      payload = this.jwt.verify(token);
+    } catch {
+      throw new UnauthorizedException('This sign-in attempt has expired - please try signing in again.');
+    }
+    if (payload?.type !== 'pending_google_profile') {
+      throw new UnauthorizedException('Invalid sign-in token');
+    }
+    return payload;
+  }
+
+  // Called by the frontend's polling loop (see the /login page's "Finishing
+  // sign-in..." state) - { ready: false } means "still waiting on Postgres,
+  // keep polling," never an HTTP error, so the frontend never has to treat a
+  // transient DB gap as a failure. A genuinely expired/invalid token, or any
+  // non-connection error, still throws - those are real, final failures.
+  async completeGoogleSignIn(token: string): Promise<{ ready: false } | { ready: true; accessToken: string; refreshToken: string }> {
+    const profile = this.verifyPendingGoogleProfile(token);
+    try {
+      const tokens = await this.loginOrCreateGoogleUser(profile);
+      return { ready: true, ...tokens };
+    } catch (err) {
+      if (err instanceof DatabaseUnavailableError) return { ready: false };
+      throw err;
+    }
   }
 
   private async issueTokens(userId: string, email: string, orgId: string) {
