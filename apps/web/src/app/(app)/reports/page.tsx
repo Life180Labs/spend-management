@@ -293,18 +293,19 @@ export default function ReportsPage() {
           {/* Billing table */}
           <div style={{ background: '#0E1014', border: '1px solid #1A1D24', borderRadius: 14, overflow: 'hidden' }}>
             {/* Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.1fr 1fr 1fr 100px', padding: '11px 20px', background: '#0C0E12', borderBottom: '1px solid #1A1D24' }}>
-              {['Tool', 'Category', 'Period', 'Amount', 'Status'].map((h) => (
+            <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr 0.9fr 0.9fr 1fr 100px', padding: '11px 20px', background: '#0C0E12', borderBottom: '1px solid #1A1D24' }}>
+              {['Tool', 'Category', 'Month', 'Period', 'Amount', 'Status'].map((h) => (
                 <div key={h} style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: '#5e636e' }}>{h}</div>
               ))}
             </div>
             {filteredBilling.map((r, i) => (
-              <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1.1fr 1fr 1fr 100px', alignItems: 'center', padding: '13px 20px', borderBottom: i < filteredBilling.length - 1 ? '1px solid #15181E' : 'none' }}>
+              <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr 0.9fr 0.9fr 1fr 100px', alignItems: 'center', padding: '13px 20px', borderBottom: i < filteredBilling.length - 1 ? '1px solid #15181E' : 'none' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 30, height: 30, borderRadius: 8, background: r.tool?.monoBgColor || '#5E6AD2', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11.5, fontWeight: 700, flexShrink: 0 }}>{r.tool?.monoInitials || '?'}</div>
                   <span style={{ fontSize: 13, fontWeight: 550, color: '#E6E8EC' }}>{r.tool?.name || 'Deleted tool'}</span>
                 </div>
                 <div style={{ fontSize: 12, color: '#9aa0ab' }}>{CAT_LABELS[r.tool?.category || ''] || r.tool?.category || '-'}</div>
+                <div style={{ fontSize: 12, color: '#9aa0ab' }}>{r.monthLabel}</div>
                 <div style={{ fontSize: 12, color: '#9aa0ab' }}>{periodRangeLabel(period, customFrom, customTo)}</div>
                 <div style={{ fontSize: 13.5, fontWeight: 650, color: '#F2F3F5', fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(r.amount)}</div>
                 <div>
