@@ -271,6 +271,25 @@ describe('exportBillingHistory', () => {
     expect(rows[1].Period).toBe('Jul – Sep 2026');
   });
 
+  it('gives each row its own Month column even when Period is identical across all of them (e.g. two rows for the same tool across a wide Year to Date range are otherwise indistinguishable)', () => {
+    exportBillingHistory(
+      [
+        { id: 'rec_1', tool: { name: 'Railway', category: 'CLOUD_INFRA', billingCycle: 'MONTHLY', renewalDate: null }, monthKey: '2026-06', monthLabel: 'Jun 2026', amount: 7.88, status: 'PAID' },
+        { id: 'rec_2', tool: { name: 'Railway', category: 'CLOUD_INFRA', billingCycle: 'MONTHLY', renewalDate: null }, monthKey: '2026-07', monthLabel: 'Jul 2026', amount: 17.0, status: 'PAID' },
+      ],
+      'ytd',
+      'USD',
+      94.4,
+      'Jan – Aug 2026',
+    );
+
+    const rows = jsonToSheetSpy.mock.calls[0][0];
+    expect(rows[0].Period).toBe('Jan – Aug 2026');
+    expect(rows[1].Period).toBe('Jan – Aug 2026');
+    expect(rows[0].Month).toBe('Jun 2026');
+    expect(rows[1].Month).toBe('Jul 2026');
+  });
+
   it('falls back to each row\'s own monthLabel when no range label is supplied (backward compatible)', () => {
     exportBillingHistory(
       [{ id: 'live-t1', tool: { name: 'Claude', category: 'AI_LLM', billingCycle: 'MONTHLY', renewalDate: null }, monthKey: '2026-08', monthLabel: 'Aug 2026', amount: 20, status: 'PENDING' }],
