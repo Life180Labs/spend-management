@@ -131,9 +131,12 @@ export function exportBillingHistory(
   currency: 'INR' | 'USD',
   fxRate: number,
   // The selected filter's human-readable range (e.g. "Jul – Sep 2026" for This
-  // Quarter) - shown in every row's Period column instead of that record's own
-  // billing month, matching the on-screen Billing History table. Falls back to
-  // each row's own monthLabel if not supplied, so existing callers don't break.
+  // Quarter) - shown in every row's Period column, same for every row in the
+  // export, unlike the Month column which is each row's own actual billing
+  // month - without Month, multiple rows for the same tool across a wide
+  // filter range (e.g. Year to Date) are indistinguishable, matching the
+  // on-screen Billing History table's Month column. Falls back to each row's
+  // own monthLabel if not supplied, so existing callers don't break.
   periodRangeLabel?: string,
 ) {
   const fmt = (n: number) =>
@@ -147,6 +150,7 @@ export function exportBillingHistory(
     return {
       Tool: r.tool?.name || 'Deleted tool',
       Category: CAT_LABELS[r.tool?.category || ''] || r.tool?.category || '-',
+      Month: r.monthLabel,
       Period: periodRangeLabel ?? r.monthLabel,
       'Start Date': fmtDDMMMYYYY(start),
       'End Date': fmtDDMMMYYYY(end),
