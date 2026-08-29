@@ -278,33 +278,21 @@ export class ReportsService {
   }
 
   /**
-   * This month's total spend: closed-out billing records for the current month
-   * (rare - usually empty until month-end) plus every active tool's live
-   * pro-rated contribution (see monthlyEquivalentSpend). This is the "live"
-   * figure - the only one of the four dashboard-spend-period options with no
-   * fixed historical answer, since the month isn't over yet.
+   * This month's total spend: for a tool that already has a closed billing
+   * record for the current month (rare - usually empty until month-end), that
+   * record IS its contribution; every other active tool contributes its live
+   * pro-rated figure (see monthlyEquivalentSpend). This is the "live" figure -
+   * the only one of the four dashboard-spend-period options with no fixed
+   * historical answer, since the month isn't over yet.
+   *
+   * Deliberately NOT closed-record-plus-live: a closed record represents that
+   * tool's ENTIRE month already, so adding the live figure on top double-counts
+   * it (regression - hit in production for three different tools' current-month
+   * rows before this was fixed to prefer the closed record instead of summing).
    */
   private async currentMonthTotal(orgId: string): Promise<number> {
-    const currentMonth = currentMonthKey();
-
-    const billingSum = await this.prisma.billingRecord.aggregate({
-      where: { orgId, monthKey: currentMonth },
-      _sum: { amount: true },
-    });
-    const historicalSpend = billingSum._sum.amount || 0;
-
-    // Real-time tool spend (subscription tools use monthlyAmount pro-rated by
-    // billingCycle, prepaid use usedAmount - see monthlyEquivalentSpend)
-    const tools = await this.prisma.tool.findMany({
-      where: { orgId, deletedAt: null },
-      select: { paymentKind: true, billingCycle: true, monthlyAmount: true, usedAmount: true },
-    });
-    const realtimeSpend = tools.reduce((sum, t) => {
-      if (t.paymentKind === 'NOBUDGET') return sum;
-      return sum + monthlyEquivalentSpend(t);
-    }, 0);
-
-    return historicalSpend + realtimeSpend;
+    const byTool = await this.currentMonthTotalByTool(orgId);
+    return Object.values(byTool).reduce((sum, amount) => sum + amount, 0);
   }
 
   private async closedMonthTotal(orgId: string, monthKey: string): Promise<number> {
@@ -316,10 +304,11 @@ export class ReportsService {
   }
 
   /**
-   * Every tool's contribution to the current month, keyed by toolId - mirrors
-   * currentMonthTotal's two parts (closed billing records for this month, rare
-   * but possible, PLUS each tool's live pro-rated spend) so the per-tool sum
-   * can never fall short of currentMonthTotal's aggregate figure.
+   * Every tool's contribution to the current month, keyed by toolId. A tool
+   * that already has a closed billing record for this month (rare but
+   * possible) uses ONLY that record - it already represents the tool's whole
+   * month, so also adding the live pro-rated figure on top would double-count
+   * it. Only a tool with NO closed record yet falls back to its live figure.
    */
   private async currentMonthTotalByTool(orgId: string): Promise<Record<string, number>> {
     const result = await this.closedMonthTotalByTool(orgId, currentMonthKey());
@@ -330,8 +319,9 @@ export class ReportsService {
     });
     for (const t of tools) {
       if (t.paymentKind === 'NOBUDGET') continue;
+      if (result[t.id] != null) continue; // already has a closed record this month - don't also add the live figure
       const amount = monthlyEquivalentSpend(t);
-      if (amount > 0) result[t.id] = (result[t.id] ?? 0) + amount;
+      if (amount > 0) result[t.id] = amount;
     }
     return result;
   }

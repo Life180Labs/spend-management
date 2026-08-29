@@ -37,6 +37,18 @@ describe('ReportsService', () => {
       );
     });
 
+    it('this_month: a tool with a closed current-month record contributes ONLY that record, not the record plus its live figure too (regression: was double-counted - $8 closed + $15 live showed as $23 instead of $8)', async () => {
+      prisma.tool.findMany.mockResolvedValue([
+        { id: 't1', paymentKind: 'PREPAID', billingCycle: 'MONTHLY', usedAmount: 15, monthlyAmount: 0 },
+        { id: 't2', paymentKind: 'MOSUB', billingCycle: 'MONTHLY', usedAmount: 0, monthlyAmount: 20 }, // no closed record - still uses its live figure
+      ]);
+      prisma.billingRecord.findMany.mockResolvedValue([{ toolId: 't1', amount: 8 }]);
+
+      const result = await service.periodSpendByTool('org1', 'this_month');
+
+      expect(result).toEqual({ t1: 8, t2: 20 });
+    });
+
     it('always sums to the same total as periodSpend, for every period (regression: table rows must sum to the KPI card)', async () => {
       prisma.tool.findMany.mockResolvedValue([
         { id: 't1', paymentKind: 'PREPAID', billingCycle: 'MONTHLY', usedAmount: 15, monthlyAmount: 0 },
