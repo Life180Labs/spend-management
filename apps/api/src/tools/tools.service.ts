@@ -143,16 +143,6 @@ export class ToolsService {
     });
   }
 
-  async duplicate(id: string, orgId: string, actorId: string) {
-    const source = await this.findOne(id, orgId);
-    const copy = await this.create(orgId, actorId, {
-      ...source,
-      name: `${source.name} (copy)`,
-      departmentId: source.departmentId || source['department']?.id,
-    });
-    return copy;
-  }
-
   async softDelete(id: string, orgId: string, actorId: string) {
     const tool = await this.findOne(id, orgId);
     const deleted = await this.prisma.tool.update({
