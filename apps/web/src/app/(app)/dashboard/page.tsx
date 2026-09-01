@@ -203,13 +203,6 @@ export default function DashboardPage() {
     load();
   }
 
-  async function duplicateTool(id: string, name: string) {
-    await api.post<Tool>(`/tools/${id}/duplicate`);
-    showToast(`${name} (copy) created`);
-    setOpenMenu(null);
-    load();
-  }
-
   const displayed = filter === 'All' ? tools
     : filter === 'NOBUDGET' ? tools.filter((t) => t.paymentKind === 'NOBUDGET')
       : filter === 'PREPAID' ? tools.filter((t) => t.paymentKind === 'PREPAID')
@@ -417,7 +410,6 @@ export default function DashboardPage() {
           <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpenMenu(null)} />
           <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, background: '#1B1E26', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '4px 0', zIndex: 50, minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
             <DropBtn label="Edit" icon={<PencilIcon />} onClick={() => { setEditTool(tools.find((t) => t.id === openMenu)!); setOpenMenu(null); }} />
-            <DropBtn label="Duplicate" icon={<CopyIcon />} onClick={() => { const t = tools.find((t) => t.id === openMenu)!; duplicateTool(t.id, t.name); }} />
             <DropBtn
               label={tools.find((t) => t.id === openMenu)?.integration ? 'Integration' : 'Connect Integration'}
               icon={<PlugIcon />}
@@ -725,6 +717,5 @@ function DropBtn({ label, icon, danger, onClick }: { label: string; icon: ReactN
 }
 
 function PencilIcon() { return <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11.5 2.5a2.1 2.1 0 0 1 3 3L5 15H2v-3L11.5 2.5Z" /></svg>; }
-function CopyIcon() { return <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="5" width="9" height="9" rx="2" /><path d="M4 11H3a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1" /></svg>; }
 function TrashIcon({ color = 'currentColor' }: { color?: string }) { return <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 13 6" /><path d="M5 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /><path d="M4 6l1 9h6l1-9" /></svg>; }
 function PlugIcon() { return <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 1v3M10 1v3" /><rect x="3" y="4" width="10" height="5" rx="2" /><path d="M8 9v3" /><path d="M6 12h4" /></svg>; }

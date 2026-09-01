@@ -45,11 +45,6 @@ export class ToolsController {
     return this.tools.softDelete(id, req.user.orgId, req.user.sub);
   }
 
-  @Post(':id/duplicate')
-  duplicate(@Param('id') id: string, @Req() req: any) {
-    return this.tools.duplicate(id, req.user.orgId, req.user.sub);
-  }
-
   @Post(':id/test-alert')
   @HttpCode(200)
   async testAlert(@Param('id') id: string, @Req() req: any) {
