@@ -419,13 +419,18 @@ export class ReportsService {
     const totalThisMonth = await this.currentMonthTotal(orgId);
 
     const [alertCount, toolCount, noBudgetCount] = await Promise.all([
+      // ONETIME has no ongoing bar%/threshold to breach (see UNBUDGETED_KINDS
+      // in tools.service.ts) - excluded here too, for the same reasoning, not
+      // because barPct happens to stay 0 for it in practice.
       this.prisma.$queryRaw<[{ count: bigint }]>`
         SELECT COUNT(*)::bigint as count FROM tools
         WHERE "orgId" = ${orgId} AND "deletedAt" IS NULL
-          AND "paymentKind" != 'NOBUDGET'
+          AND "paymentKind" NOT IN ('NOBUDGET', 'ONETIME')
           AND "barPct" >= "alertThresholdPct"
       `.then((r) => Number(r[0].count)),
       this.prisma.tool.count({ where: { orgId, deletedAt: null } }),
+      // NOBUDGET-only, deliberately - a ONETIME tool already has a real
+      // amount attached, it shouldn't be flagged as "needs budget setup."
       this.prisma.tool.count({ where: { orgId, deletedAt: null, paymentKind: 'NOBUDGET' } }),
     ]);
 

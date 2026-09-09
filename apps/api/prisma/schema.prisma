@@ -38,6 +38,10 @@ enum PaymentKind {
   CAPSUB     // monthly cap subscription
   MOSUB      // flat monthly subscription
   NOBUDGET   // uncapped - triggers "needs budget" alert
+  ONETIME    // paid once, not recurring - captured as a single billing_records
+             // row (see ToolsService.create), excluded from live/recurring
+             // spend the same way NOBUDGET is, but NOT flagged as "needs
+             // budget setup" since it's already fully configured
 }
 
 // How often a subscription (MOSUB/CAPSUB) renews - orthogonal to PaymentKind,

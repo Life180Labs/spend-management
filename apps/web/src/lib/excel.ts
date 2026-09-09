@@ -185,7 +185,7 @@ interface ToolRow {
 }
 
 const PAY_LABELS: Record<string, string> = {
-  PREPAID: 'Usage-based', MOSUB: 'Subscription', CAPSUB: 'Cap + Sub', NOBUDGET: 'No budget',
+  PREPAID: 'Usage-based', MOSUB: 'Subscription', CAPSUB: 'Cap + Sub', NOBUDGET: 'No budget', ONETIME: 'One Time',
 };
 
 export function exportToolsList(
@@ -216,9 +216,11 @@ export function exportToolsList(
       'Payment Type': isWallet ? 'Wallet' : (PAY_LABELS[t.paymentKind] || t.paymentKind),
       [`Used (${sym})`]: fmt(used),
       [`Budget Cap (${sym})`]: cap > 0 ? fmt(cap) : 'Uncapped',
-      '% Used': t.paymentKind !== 'NOBUDGET' ? `${t.barPct}%` : '-',
+      // ONETIME has no ongoing bar%/threshold - same "-" treatment as NOBUDGET,
+      // rather than a misleading "0%" (its barPct is never touched after creation).
+      '% Used': (t.paymentKind !== 'NOBUDGET' && t.paymentKind !== 'ONETIME') ? `${t.barPct}%` : '-',
       [`Remaining Balance (${sym})`]: isWallet ? fmt(remainingBalance!) : '-',
-      'Alert Threshold': t.paymentKind !== 'NOBUDGET' ? `${t.alertThresholdPct}%` : '-',
+      'Alert Threshold': (t.paymentKind !== 'NOBUDGET' && t.paymentKind !== 'ONETIME') ? `${t.alertThresholdPct}%` : '-',
       'Alert Active': t.alert ? 'Yes' : 'No',
       'Notify Email': t.triggerEmail || '-',
       'Renewal Date': t.renewalDate ? new Date(t.renewalDate).toLocaleDateString('en-IN') : '-',

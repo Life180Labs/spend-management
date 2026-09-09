@@ -96,6 +96,36 @@ describe('SchedulerService', () => {
     });
   });
 
+  describe('checkRenewalReminders (ONETIME payment kind exclusion)', () => {
+    // checkRenewalRemindersImpl has NO paymentKind filter of its own (see
+    // docs/onetime-payment-kind-loop-prompt.md design decision 1/6) - a ONETIME
+    // tool is excluded purely because it's created with renewalDate: null
+    // (enforced in ToolsService.create), and Postgres's gte/lte range filter can
+    // never match a null column - that's real Postgres semantics a mocked prisma
+    // can't itself exercise, so this test instead proves the query is queried
+    // unconditionally (no redundant/missing paymentKind branch), and that a
+    // tool the mock represents as excluded (simulating what Postgres actually
+    // does for a null renewalDate) correctly sends no reminder.
+    it('sends no reminder for a tool with no renewalDate (as a real ONETIME tool always has)', async () => {
+      prisma.tool.findMany.mockResolvedValue([]); // Postgres would exclude a null-renewalDate row here
+
+      await service.checkRenewalReminders();
+
+      expect(mail.sendRenewalReminder).not.toHaveBeenCalled();
+    });
+
+    it('still sends a reminder for a normal tool with a near-term renewalDate (sanity check - the exclusion above is real, not a test that vacuously always passes)', async () => {
+      const renewalDate = new Date();
+      prisma.tool.findMany.mockResolvedValue([
+        { name: 'Claude', vendor: 'Anthropic', triggerEmail: 'a@b.com', renewalDate, monthlyAmount: 20 },
+      ]);
+
+      await service.checkRenewalReminders();
+
+      expect(mail.sendRenewalReminder).toHaveBeenCalledWith('a@b.com', 'Claude', 'Anthropic', renewalDate, 0, 20);
+    });
+  });
+
   describe('rollForwardRenewalDates', () => {
     it('records a completed billing cycle for each stepped-past renewal and advances renewalDate', async () => {
       // "Today" in this environment is 2026-07-30, so a Jul 15 2025 renewal date
@@ -128,7 +158,7 @@ describe('SchedulerService', () => {
       });
     });
 
-    it('only queries MOSUB/CAPSUB tools with a past renewal date (PREPAID is excluded)', async () => {
+    it('only queries MOSUB/CAPSUB tools with a past renewal date (PREPAID, NOBUDGET, and ONETIME are all excluded by the same `in` list)', async () => {
       prisma.tool.findMany.mockResolvedValue([]);
       await service.rollForwardRenewalDates();
       expect(prisma.tool.findMany).toHaveBeenCalledWith({

@@ -4,6 +4,7 @@ import { ToolsService } from './tools.service';
 describe('ToolsService', () => {
   let prisma: any;
   let audit: any;
+  let billing: any;
   let service: ToolsService;
 
   beforeEach(() => {
@@ -13,7 +14,8 @@ describe('ToolsService', () => {
       alertConfig: { updateMany: jest.fn() },
     };
     audit = { log: jest.fn() };
-    service = new ToolsService(prisma, audit);
+    billing = { recordCompletedCycle: jest.fn().mockResolvedValue({ id: 'br1' }) };
+    service = new ToolsService(prisma, audit, billing);
   });
 
   describe('create', () => {
@@ -50,6 +52,63 @@ describe('ToolsService', () => {
       expect(prisma.tool.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ billingCycle: 'YEARLY' }) }),
       );
+    });
+
+    it('ONETIME: logs a single billing_records row for the given date, reusing BillingService.recordCompletedCycle rather than a second insert path', async () => {
+      prisma.tool.count.mockResolvedValue(0);
+      prisma.tool.create.mockResolvedValue({ id: 't1' });
+
+      await service.create('org1', 'actor1', {
+        name: 'Hostinger', departmentId: 'd1', paymentKind: 'ONETIME',
+        monthlyAmount: 4.23, oneTimePaidAt: '2026-08-12',
+      } as any);
+
+      expect(billing.recordCompletedCycle).toHaveBeenCalledWith('org1', 't1', '2026-08', 4.23, new Date('2026-08-12'));
+    });
+
+    it('ONETIME: defaults the paid date to today when oneTimePaidAt is omitted', async () => {
+      prisma.tool.count.mockResolvedValue(0);
+      prisma.tool.create.mockResolvedValue({ id: 't1' });
+      jest.useFakeTimers().setSystemTime(new Date(2026, 8, 9)); // 9 Sep 2026
+
+      await service.create('org1', 'actor1', { name: 'Hostinger', departmentId: 'd1', paymentKind: 'ONETIME', monthlyAmount: 10 } as any);
+
+      expect(billing.recordCompletedCycle).toHaveBeenCalledWith('org1', 't1', '2026-09', 10, new Date(2026, 8, 9));
+      jest.useRealTimers();
+    });
+
+    it('does NOT log a billing record for any other payment kind', async () => {
+      prisma.tool.count.mockResolvedValue(0);
+      prisma.tool.create.mockResolvedValue({ id: 't1' });
+
+      await service.create('org1', 'actor1', { name: 'Claude', departmentId: 'd1', paymentKind: 'MOSUB', monthlyAmount: 20 } as any);
+
+      expect(billing.recordCompletedCycle).not.toHaveBeenCalled();
+    });
+
+    it('renewalDate is stripped for ONETIME even if the caller supplies one - enforced server-side, not just trusted to the frontend never sending it', async () => {
+      prisma.tool.count.mockResolvedValue(0);
+      prisma.tool.create.mockResolvedValue({ id: 't1' });
+
+      await service.create('org1', 'actor1', {
+        name: 'Hostinger', departmentId: 'd1', paymentKind: 'ONETIME', monthlyAmount: 4.23,
+        renewalDate: '2026-09-12', // a buggy/stale caller sending this must not defeat the guard
+      } as any);
+
+      const data = prisma.tool.create.mock.calls[0][0].data;
+      expect(data.renewalDate).toBeUndefined();
+    });
+
+    it('does not strip renewalDate for a normal MOSUB tool', async () => {
+      prisma.tool.count.mockResolvedValue(0);
+      prisma.tool.create.mockResolvedValue({ id: 't1' });
+
+      await service.create('org1', 'actor1', {
+        name: 'Claude', departmentId: 'd1', paymentKind: 'MOSUB', monthlyAmount: 20, renewalDate: '2026-09-18',
+      } as any);
+
+      const data = prisma.tool.create.mock.calls[0][0].data;
+      expect(data.renewalDate).toEqual(new Date('2026-09-18'));
     });
   });
 
@@ -106,6 +165,18 @@ describe('ToolsService', () => {
       const result = await service.findOne('t1', 'org1');
       expect(result.alert).toBe(false);
       expect(result.statusSub).toBe('No budget configured');
+    });
+
+    it('never flags alert for ONETIME tools regardless of barPct, and labels it distinctly from "No budget configured"', async () => {
+      prisma.tool.findFirst.mockResolvedValue({
+        id: 't1',
+        paymentKind: 'ONETIME',
+        barPct: 100,
+        alertConfigs: [],
+      });
+      const result = await service.findOne('t1', 'org1');
+      expect(result.alert).toBe(false);
+      expect(result.statusSub).toBe('One-time purchase');
     });
 
     it('clamps daysUntilRenewal to 0 for a renewal date that has already passed but not yet been rolled forward', async () => {

@@ -10,12 +10,14 @@
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { ToolsService } from '../src/tools/tools.service';
+import { BillingService } from '../src/billing/billing.service';
 
 async function main() {
   const prisma = new PrismaService();
   await prisma.$connect();
   const audit = new AuditService(prisma);
-  const tools = new ToolsService(prisma, audit);
+  const billing = new BillingService(prisma, audit);
+  const tools = new ToolsService(prisma, audit, billing);
 
   const org = await prisma.organization.findFirst();
   const dept = await prisma.department.findFirst({ where: { orgId: org!.id } });

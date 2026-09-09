@@ -67,6 +67,74 @@ describe('AddToolModal', () => {
     expect(screen.getByDisplayValue('Yearly')).toBeInTheDocument();
   });
 
+  it('ONETIME: picking "One Time" shows Amount + Date paid (no billing cycle, no renewal date, no notification email), and submits oneTimePaidAt without ever sending renewalDate', async () => {
+    (api.get as jest.Mock).mockResolvedValue([{ id: 'dept1' }]);
+    (api.post as jest.Mock).mockResolvedValue({ id: 'tool1' });
+    const user = userEvent.setup();
+    const onCreated = jest.fn();
+
+    render(<AddToolModal onClose={jest.fn()} onCreated={onCreated} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add tool' })).not.toBeDisabled());
+
+    await user.type(screen.getByPlaceholderText('e.g. ChatGPT'), 'Hostinger');
+    await user.type(screen.getByPlaceholderText('e.g. OpenAI'), 'Hostinger');
+
+    // Payment type is the 3rd combobox in a blank form: Integration, Category, Payment type.
+    const paymentSelect = screen.getAllByRole('combobox')[2];
+    await user.selectOptions(paymentSelect, 'ONETIME');
+
+    expect(screen.getByText('Amount ($)')).toBeInTheDocument();
+    expect(screen.getByText('Date paid')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Billing cycle')).not.toBeInTheDocument();
+    expect(screen.queryByText('Renewal date')).not.toBeInTheDocument();
+    expect(screen.queryByText('Notifications')).not.toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('e.g. 4.23'), '4.23');
+    fireEvent.change(screen.getByDisplayValue(new Date().toISOString().split('T')[0]), { target: { value: '2026-08-12' } });
+
+    await user.click(screen.getByRole('button', { name: 'Add tool' }));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tools', expect.objectContaining({
+      paymentKind: 'ONETIME',
+      monthlyAmount: 4.23,
+      oneTimePaidAt: new Date('2026-08-12').toISOString(),
+      renewalDate: undefined,
+      triggerEmail: undefined,
+    })));
+  });
+
+  it('ONETIME: blocks submission when Amount is left blank', async () => {
+    (api.get as jest.Mock).mockResolvedValue([{ id: 'dept1' }]);
+    const user = userEvent.setup();
+
+    render(<AddToolModal onClose={jest.fn()} onCreated={jest.fn()} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add tool' })).not.toBeDisabled());
+
+    await user.type(screen.getByPlaceholderText('e.g. ChatGPT'), 'Hostinger');
+    await user.type(screen.getByPlaceholderText('e.g. OpenAI'), 'Hostinger');
+    await user.selectOptions(screen.getAllByRole('combobox')[2], 'ONETIME');
+    await user.click(screen.getByRole('button', { name: 'Add tool' }));
+
+    await waitFor(() => expect(screen.getByText('Amount is required.')).toBeInTheDocument());
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('edit mode: ONETIME shows Amount locked (read-only), not an editable input', async () => {
+    (api.get as jest.Mock).mockResolvedValue([{ id: 'dept1' }]);
+
+    const tool = {
+      id: 'tool1', name: 'Hostinger', vendor: 'Hostinger', category: 'HOSTING',
+      paymentKind: 'ONETIME', billingCycle: 'MONTHLY', capAmount: 0, monthlyAmount: 4.23,
+      alertThresholdPct: 80, triggerEmail: null, renewalDate: null,
+    };
+
+    render(<AddToolModal onClose={jest.fn()} onCreated={jest.fn()} tool={tool} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save changes' })).not.toBeDisabled());
+
+    expect(screen.getByText('$4.23')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('e.g. 4.23')).not.toBeInTheDocument();
+  });
+
   it('disables an already-connected provider in the Integration dropdown (dedup by vendor existence)', async () => {
     (api.get as jest.Mock).mockResolvedValue([{ id: 'dept1' }]);
 

@@ -33,4 +33,11 @@ export class CreateToolDto {
 
   @IsOptional() @IsDateString()
   renewalDate?: string;
+
+  // Only meaningful when paymentKind is ONETIME - the date the (one-off, non-
+  // recurring) payment was made. Not stored on the Tool itself; ToolsService.create
+  // uses it to log a single billing_records row for that month. Defaults to
+  // today if omitted.
+  @IsOptional() @IsDateString()
+  oneTimePaidAt?: string;
 }

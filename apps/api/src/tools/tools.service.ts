@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { BillingService } from '../billing/billing.service';
 import { CreateToolDto } from './dto/create-tool.dto';
 import { UpdateToolDto } from './dto/update-tool.dto';
 
@@ -13,11 +14,17 @@ const MONO_COLORS = [
   '#E0529C', '#0EA5E9', '#8B5CF6',
 ];
 
+// Payment kinds with no ongoing bar%/cap being tracked - NOBUDGET was never
+// configured, ONETIME is a single past payment, not a budget accruing toward
+// a limit. Neither can breach a threshold.
+const UNBUDGETED_KINDS = ['NOBUDGET', 'ONETIME'];
+
 @Injectable()
 export class ToolsService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private billing: BillingService,
   ) {}
 
   async create(orgId: string, actorId: string, dto: CreateToolDto) {
@@ -40,7 +47,13 @@ export class ToolsService {
         monthlyAmount: dto.monthlyAmount || 0,
         alertThresholdPct: dto.alertThresholdPct || 80,
         triggerEmail: dto.triggerEmail,
-        renewalDate: dto.renewalDate ? new Date(dto.renewalDate) : undefined,
+        // ONETIME never gets a renewalDate, regardless of what the caller sends -
+        // checkRenewalRemindersImpl has no payment-kind filter of its own (see
+        // docs/onetime-payment-kind-loop-prompt.md design decision 1), so a stray
+        // renewalDate here would silently reintroduce the exact false "renewing
+        // soon" email this payment kind exists to avoid. Enforced here rather than
+        // trusted to the frontend never sending one.
+        renewalDate: dto.paymentKind === 'ONETIME' ? undefined : (dto.renewalDate ? new Date(dto.renewalDate) : undefined),
         monoInitials: initials,
         monoBgColor: monoBg,
         alertConfigs: {
@@ -56,6 +69,18 @@ export class ToolsService {
         throw new ConflictException(`A tool named "${dto.name}" already exists in this workspace`);
       }
       throw err;
+    }
+
+    // ONETIME's amount+date is captured as a single billing_records row, not a
+    // Tool column - reuses the exact idempotent method the rollover cron and
+    // every manual backfill this session already use, rather than a second
+    // insert path. renewalDate deliberately stays null for ONETIME (see
+    // docs/onetime-payment-kind-loop-prompt.md) so this is the only place its
+    // paid-date/amount is recorded at all.
+    if (dto.paymentKind === 'ONETIME') {
+      const paidAt = dto.oneTimePaidAt ? new Date(dto.oneTimePaidAt) : new Date();
+      const monthKey = `${paidAt.getFullYear()}-${String(paidAt.getMonth() + 1).padStart(2, '0')}`;
+      await this.billing.recordCompletedCycle(orgId, tool.id, monthKey, dto.monthlyAmount || 0, paidAt);
     }
 
     await this.audit.log(orgId, actorId, 'tool.created', 'Tool', tool.id, null, tool);
@@ -161,7 +186,10 @@ export class ToolsService {
 
   private enrichTool(tool: any) {
     const thresholdPct = tool.alertConfigs?.[0]?.thresholdPct ?? tool.alertThresholdPct ?? 80;
-    const alert = tool.paymentKind !== 'NOBUDGET' && tool.barPct >= thresholdPct;
+    // ONETIME has no ongoing bar%/threshold to breach - it's a single past
+    // payment, not a budget being tracked toward a cap - same reasoning as
+    // NOBUDGET's exclusion here.
+    const alert = !UNBUDGETED_KINDS.includes(tool.paymentKind) && tool.barPct >= thresholdPct;
 
     // Clamped to 0 minimum, matching every other days-away calc in the codebase
     // (dashboardKpis' nearestRenewal, checkRenewalReminders) - a renewal date that
@@ -183,6 +211,7 @@ export class ToolsService {
     if (tool.paymentKind === 'PREPAID') return `${tool.barPct}% used`;
     if (tool.paymentKind === 'CAPSUB') return `${tool.barPct}% of cap`;
     if (tool.paymentKind === 'MOSUB') return `cycle ${tool.barPct}%`;
+    if (tool.paymentKind === 'ONETIME') return 'One-time purchase';
     return 'No budget configured';
   }
 }

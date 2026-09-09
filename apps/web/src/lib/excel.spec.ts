@@ -69,6 +69,27 @@ describe('exportToolsList', () => {
     expect(rows[0]['Payment Type']).toBe('Subscription');
     expect(rows[0]['Remaining Balance ($)']).toBe('-');
   });
+
+  it('labels ONETIME "One Time" and shows "-" (not "0%") for % Used and Alert Threshold - no ongoing bar% concept for a one-off payment', () => {
+    exportToolsList(
+      [
+        {
+          name: 'Hostinger', vendor: 'Hostinger', category: 'HOSTING', paymentKind: 'ONETIME',
+          usedAmount: 0, capAmount: 0, monthlyAmount: 4.23, barPct: 0, alertThresholdPct: 80, alert: false,
+          triggerEmail: null, renewalDate: null, daysUntilRenewal: null,
+        },
+      ],
+      'All',
+      'USD',
+      94.4,
+    );
+
+    const rows = jsonToSheetSpy.mock.calls[0][0];
+    expect(rows[0]['Payment Type']).toBe('One Time');
+    expect(rows[0]['% Used']).toBe('-');
+    expect(rows[0]['Alert Threshold']).toBe('-');
+    expect(rows[0]['Used ($)']).toBe('4.23'); // the one-time amount, via the existing monthlyAmount fallback
+  });
 });
 
 describe('exportSpendAnalysis', () => {
@@ -181,6 +202,22 @@ describe('exportBillingHistory', () => {
     const rows = jsonToSheetSpy.mock.calls[0][0];
     expect(rows[0]['Start Date']).toBe('01/Feb/2026');
     expect(rows[0]['End Date']).toBe('28/Feb/2026'); // 2026 is not a leap year
+  });
+
+  it('a ONETIME tool\'s historical row (no Tool schema change needed - billingRowPeriod only ever looks at renewalDate, which is always null for ONETIME) falls back to the same calendar-month boundaries', () => {
+    exportBillingHistory(
+      [{
+        id: 'rec_hostinger', tool: { name: 'Hostinger', category: 'HOSTING', billingCycle: 'MONTHLY', renewalDate: null },
+        monthKey: '2026-08', monthLabel: 'Aug 2026', amount: 4.23, status: 'PAID',
+      }],
+      'current', 'USD', 94.4,
+    );
+
+    const rows = jsonToSheetSpy.mock.calls[0][0];
+    expect(rows[0]['Start Date']).toBe('01/Aug/2026');
+    expect(rows[0]['End Date']).toBe('31/Aug/2026');
+    expect(rows[0].Month).toBe('Aug 2026');
+    expect(rows[0].Status).toBe('Paid');
   });
 
   it('a live row still mid-cycle before its renewal day has arrived starts BEFORE end (regression: renews on the 18th, today is the 9th → 18/Jul to 09/Aug, not 18/Aug to 09/Aug)', () => {

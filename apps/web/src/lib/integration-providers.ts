@@ -14,7 +14,7 @@ export interface IntegrationProviderMeta {
   /** Whether this provider can report a spend limit/hard cap via API (see fetchLimitsUSD on the backend). Meaningless when hasApi is false. */
   hasLimits: boolean;
   /** Payment type this vendor is naturally tracked as - auto-applied when picked from the dropdown. */
-  defaultPaymentKind: 'PREPAID' | 'MOSUB';
+  defaultPaymentKind: 'PREPAID' | 'MOSUB' | 'ONETIME';
   /** Only meaningful for MOSUB vendors. */
   defaultBillingCycle?: 'MONTHLY' | 'YEARLY';
   /** True when connecting needs more than one credential field (e.g. GCP needs a

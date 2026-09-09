@@ -146,6 +146,10 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
   const [renewalDate, setRenewalDate] = useState(
     tool?.renewalDate ? new Date(tool.renewalDate).toISOString().split('T')[0] : ''
   );
+  // ONETIME only - not a Tool field, just carries the paid date into the one
+  // billing_records row ToolsService.create() logs at creation (see
+  // docs/onetime-payment-kind-loop-prompt.md). Not shown/editable once created.
+  const [oneTimePaidAt, setOneTimePaidAt] = useState(new Date().toISOString().split('T')[0]);
 
   /* ── add-mode setup ─────────────────────────────────────────────────── */
   const [mode, setMode] = useState<'api' | 'manual'>('manual');
@@ -268,7 +272,9 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
   /* ── submit handler ──────────────────────────────────────────────────── */
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const needsEmail = paymentKind !== 'NOBUDGET';
+    // ONETIME has no ongoing threshold/renewal to notify about - same
+    // reasoning as NOBUDGET's exclusion here.
+    const needsEmail = paymentKind !== 'NOBUDGET' && paymentKind !== 'ONETIME';
 
     if (isEdit) {
       if (!name.trim()) { setError('Tool name is required'); return; }
@@ -308,6 +314,9 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
     if (paymentKind === 'MOSUB' && !monthlyAmount) {
       setError('Monthly amount is required.'); return;
     }
+    if (paymentKind === 'ONETIME' && !monthlyAmount) {
+      setError('Amount is required.'); return;
+    }
 
     setError(''); setLoading(true);
     try {
@@ -321,7 +330,11 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
         monthlyAmount: monthlyAmount ? Number(monthlyAmount) : undefined,
         alertThresholdPct: alert,
         triggerEmail: needsEmail ? `${emailUser.trim()}@life180labs.com` : undefined,
-        renewalDate: renewalDate ? new Date(renewalDate).toISOString() : undefined,
+        // ONETIME never sends renewalDate, even if a stale value is sitting in
+        // that field's state from switching payment kinds mid-form - matches
+        // the same guard ToolsService.create() enforces server-side.
+        renewalDate: paymentKind === 'ONETIME' ? undefined : (renewalDate ? new Date(renewalDate).toISOString() : undefined),
+        oneTimePaidAt: paymentKind === 'ONETIME' ? new Date(oneTimePaidAt).toISOString() : undefined,
       };
 
       const result = await api.post<any>('/tools', { ...payload, departmentId: depts[0]?.id });
@@ -433,12 +446,13 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
                 <label style={S.label}>Payment type</label>
                 {isEdit ? (
                   <div style={S.lockedInput}>
-                    {paymentKind === 'PREPAID' ? 'Usage-based' : paymentKind === 'MOSUB' ? 'Subscription' : 'No budget'}
+                    {paymentKind === 'PREPAID' ? 'Usage-based' : paymentKind === 'MOSUB' ? 'Subscription' : paymentKind === 'ONETIME' ? 'One Time' : 'No budget'}
                   </div>
                 ) : (
                   <select value={paymentKind} onChange={(e) => { setPaymentKind(e.target.value); setFetchStatus('idle'); setLimits(null); }} style={S.select}>
                     <option value="PREPAID">Usage-based</option>
                     <option value="MOSUB">Subscription</option>
+                    <option value="ONETIME">One Time</option>
                     <option value="NOBUDGET">No budget</option>
                   </select>
                 )}
@@ -679,10 +693,43 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
             </div>
           )}
 
+          {/* One-time amount + date paid - no billing cycle, no cap, no renewal
+              date (see docs/onetime-payment-kind-loop-prompt.md design decision 1).
+              Date paid isn't stored on the Tool (only in the billing_records row
+              ToolsService.create logs), so edit mode shows just the amount, locked -
+              same "immutable after creation" treatment as MOSUB's amount above. */}
+          {paymentKind === 'ONETIME' && (
+            <div>
+              <div style={S.sectionTitle}>Budget</div>
+              <div style={S.row2}>
+                <div>
+                  <label style={S.label}>Amount ($)</label>
+                  {isEdit ? (
+                    <div style={S.lockedInput}>${Number(monthlyAmount).toLocaleString('en-US')}</div>
+                  ) : (
+                    <input type="number" min={0.01} step="0.01" value={monthlyAmount} onChange={(e) => setMonthlyAmount(e.target.value)}
+                      placeholder="e.g. 4.23" style={S.input} />
+                  )}
+                </div>
+                <div>
+                  <label style={S.label}>Date paid</label>
+                  {isEdit ? (
+                    <div style={S.lockedInput}>See Billing History</div>
+                  ) : (
+                    <input type="date" value={oneTimePaidAt} onChange={(e) => setOneTimePaidAt(e.target.value)}
+                      style={{ ...S.input, colorScheme: 'dark' }} />
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ══════════════════════════════════════════════════════════
-              3. NOTIFICATIONS
+              3. NOTIFICATIONS - also excludes ONETIME (no ongoing threshold
+              or renewal to notify about, and critically, this is the only
+              renewal date input in the form - ONETIME must never see it)
           ══════════════════════════════════════════════════════════ */}
-          {paymentKind !== 'NOBUDGET' && (
+          {paymentKind !== 'NOBUDGET' && paymentKind !== 'ONETIME' && (
             <div>
               <div style={S.sectionTitle}>Notifications</div>
               <div style={{ marginBottom: 12 }}>
