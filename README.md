@@ -152,9 +152,9 @@ Cost data comes from **BigQuery Billing Export**, a daily batch table (hours-to-
 Alert and renewal emails are sent via [Resend](https://resend.com).
 
 To send from your own domain:
-1. Add your domain in Resend → Domains
-2. Add the DNS records Resend provides (SPF, DKIM, DMARC)
-3. Set `MAIL_FROM` in `.env` to a verified address on that domain
+1. Add your domain in Resend → Domains.
+2. Add the DNS records Resend provides (SPF, DKIM, DMARC).
+3. Set `MAIL_FROM` in `.env` to a verified address on that domain.
 
 ## Stopping services
 
