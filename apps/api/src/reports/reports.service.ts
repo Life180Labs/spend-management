@@ -296,11 +296,8 @@ export class ReportsService {
   }
 
   private async closedMonthTotal(orgId: string, monthKey: string): Promise<number> {
-    const sum = await this.prisma.billingRecord.aggregate({
-      where: { orgId, monthKey },
-      _sum: { amount: true },
-    });
-    return sum._sum.amount || 0;
+    const byTool = await this.closedMonthTotalByTool(orgId, monthKey);
+    return Object.values(byTool).reduce((sum, amount) => sum + amount, 0);
   }
 
   /**
@@ -337,6 +334,28 @@ export class ReportsService {
       if (!r.toolId) continue;
       result[r.toolId] = (result[r.toolId] ?? 0) + r.amount;
     }
+
+    // MOSUB is a flat fee - the same every month by definition (see
+    // monthlyEquivalentSpend), unlike PREPAID/CAPSUB whose current usedAmount
+    // is a live figure that can't stand in for a past month's actual usage.
+    // The roll-forward cron (scheduler.service.ts) only logs a closed month
+    // once that subscription's renewal cycle has actually rolled past it, so
+    // a MOSUB tool that already existed that month can still be missing a
+    // record here (cron hasn't caught up, or its cycle doesn't land inside
+    // this calendar month) - fall back to its flat rate rather than reporting
+    // $0 for a subscription that was clearly active.
+    const [year, month] = monthKey.split('-').map(Number);
+    const startOfNextMonth = new Date(year, month, 1);
+    const mosubTools = await this.prisma.tool.findMany({
+      where: { orgId, deletedAt: null, paymentKind: 'MOSUB', createdAt: { lt: startOfNextMonth } },
+      select: { id: true, paymentKind: true, billingCycle: true, monthlyAmount: true, usedAmount: true },
+    });
+    for (const t of mosubTools) {
+      if (result[t.id] != null) continue; // already has a closed record this month
+      const amount = monthlyEquivalentSpend(t);
+      if (amount > 0) result[t.id] = amount;
+    }
+
     return result;
   }
 

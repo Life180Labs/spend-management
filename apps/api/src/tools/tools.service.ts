@@ -91,7 +91,12 @@ export class ToolsService {
     const where: any = { orgId, deletedAt: null };
     if (filters.category) where.category = filters.category;
     if (filters.paymentKind) where.paymentKind = filters.paymentKind;
-    if (filters.hasAlert === true) where.barPct = { gte: where.alertThresholdPct };
+    // barPct vs. alertThresholdPct is a same-row column comparison, which Prisma's
+    // query builder can't express directly (there's no field-to-field `gte` - the
+    // previous `{ gte: where.alertThresholdPct }` read back an always-undefined key
+    // off `where` itself, so this filter silently did nothing). Filtering on the
+    // already-enriched `alert` flag below reuses enrichTool's threshold precedence
+    // and UNBUDGETED_KINDS exclusion instead of duplicating that logic here.
 
     const tools = await this.prisma.tool.findMany({
       where,
@@ -99,7 +104,8 @@ export class ToolsService {
       orderBy: { name: 'asc' },
     });
 
-    return tools.map((t) => this.enrichTool(t));
+    const enriched = tools.map((t) => this.enrichTool(t));
+    return filters.hasAlert === true ? enriched.filter((t) => t.alert) : enriched;
   }
 
   async findOne(id: string, orgId: string) {
@@ -185,7 +191,13 @@ export class ToolsService {
   }
 
   private enrichTool(tool: any) {
-    const thresholdPct = tool.alertConfigs?.[0]?.thresholdPct ?? tool.alertThresholdPct ?? 80;
+    // tool.alertThresholdPct is the source of truth shown in the UI and used by
+    // the email scheduler (scheduler.service.ts) - it's kept current by live
+    // integration syncs (integration-runner.service.ts recomputes it from the
+    // provider's own budget limits). alertConfigs[0].thresholdPct is a mirror
+    // captured at tool-creation time that syncs never touch, so it can drift
+    // stale - only fall back to it when the tool has no threshold of its own.
+    const thresholdPct = tool.alertThresholdPct ?? tool.alertConfigs?.[0]?.thresholdPct ?? 80;
     // ONETIME has no ongoing bar%/threshold to breach - it's a single past
     // payment, not a budget being tracked toward a cap - same reasoning as
     // NOBUDGET's exclusion here.

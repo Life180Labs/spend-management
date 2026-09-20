@@ -350,21 +350,32 @@ export default function DashboardPage() {
       </div>
 
       {/* Fixed dropdown menu */}
-      {openMenu && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpenMenu(null)} />
-          <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, background: '#1B1E26', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '4px 0', zIndex: 50, minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
-            <DropBtn label="Edit" icon={<PencilIcon />} onClick={() => { setEditTool(tools.find((t) => t.id === openMenu)!); setOpenMenu(null); }} />
-            <DropBtn
-              label={tools.find((t) => t.id === openMenu)?.integration ? 'Integration' : 'Connect Integration'}
-              icon={<PlugIcon />}
-              onClick={() => { setIntegrationTool(tools.find((t) => t.id === openMenu)!); setOpenMenu(null); }}
-            />
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '3px 0' }} />
-            <DropBtn label="Delete" icon={<TrashIcon />} danger onClick={() => { setConfirmDelete(tools.find((t) => t.id === openMenu)!); setOpenMenu(null); }} />
-          </div>
-        </>
-      )}
+      {openMenu && (() => {
+        const menuTool = tools.find((t) => t.id === openMenu)!;
+        // Subscriptions (flat/capped monthly - "Subscription" in the Payment
+        // Type column) are a fixed recurring amount, not something a live
+        // usage-based sync applies to - only offer connecting one when the
+        // tool doesn't already have one (never yank away management of an
+        // existing integration left over from before this restriction).
+        const hideConnect = ['MOSUB', 'CAPSUB'].includes(menuTool.paymentKind) && !menuTool.integration;
+        return (
+          <>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpenMenu(null)} />
+            <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, background: '#1B1E26', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '4px 0', zIndex: 50, minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+              <DropBtn label="Edit" icon={<PencilIcon />} onClick={() => { setEditTool(menuTool); setOpenMenu(null); }} />
+              {!hideConnect && (
+                <DropBtn
+                  label={menuTool.integration ? 'Integration' : 'Connect Integration'}
+                  icon={<PlugIcon />}
+                  onClick={() => { setIntegrationTool(menuTool); setOpenMenu(null); }}
+                />
+              )}
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '3px 0' }} />
+              <DropBtn label="Delete" icon={<TrashIcon />} danger onClick={() => { setConfirmDelete(menuTool); setOpenMenu(null); }} />
+            </div>
+          </>
+        );
+      })()}
 
       {/* Toast */}
       {toast && (

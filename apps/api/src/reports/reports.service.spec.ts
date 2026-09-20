@@ -6,7 +6,7 @@ describe('ReportsService', () => {
 
   beforeEach(() => {
     prisma = {
-      tool: { findMany: jest.fn() },
+      tool: { findMany: jest.fn().mockResolvedValue([]) },
       billingRecord: { aggregate: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     };
     service = new ReportsService(prisma);
@@ -34,6 +34,42 @@ describe('ReportsService', () => {
       expect(result).toEqual({ t1: 20, t2: 5 });
       expect(prisma.billingRecord.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: expect.objectContaining({ orgId: 'org1' }) }),
+      );
+    });
+
+    it('last_month: falls back to a MOSUB tool\'s flat rate when the roll-forward cron has not logged that month yet (regression: showed $0 for an active subscription instead of its monthly fee)', async () => {
+      prisma.billingRecord.findMany.mockResolvedValue([]); // cron hasn't closed this month out yet
+      prisma.tool.findMany.mockImplementation(({ where }: any) =>
+        where.paymentKind === 'MOSUB'
+          ? [{ id: 't1', paymentKind: 'MOSUB', billingCycle: 'MONTHLY', monthlyAmount: 10, usedAmount: 0 }]
+          : [],
+      );
+
+      const result = await service.periodSpendByTool('org1', 'last_month');
+      expect(result).toEqual({ t1: 10 });
+    });
+
+    it('last_month: does NOT fall back for PREPAID/CAPSUB - current usedAmount is a live figure, not what was actually used in a past closed month', async () => {
+      prisma.billingRecord.findMany.mockResolvedValue([]);
+      prisma.tool.findMany.mockImplementation(({ where }: any) =>
+        where.paymentKind === 'MOSUB' ? [] : [{ id: 't1', paymentKind: 'PREPAID', billingCycle: 'MONTHLY', monthlyAmount: 0, usedAmount: 15 }],
+      );
+
+      const result = await service.periodSpendByTool('org1', 'last_month');
+      expect(result).toEqual({});
+    });
+
+    it('last_month: queries MOSUB fallback candidates with createdAt before the start of the following month, so a tool created after that month is excluded server-side', async () => {
+      prisma.billingRecord.findMany.mockResolvedValue([]);
+      const now = new Date();
+      const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      await service.periodSpendByTool('org1', 'last_month');
+
+      expect(prisma.tool.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ paymentKind: 'MOSUB', createdAt: { lt: startOfThisMonth } }),
+        }),
       );
     });
 
