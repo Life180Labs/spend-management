@@ -51,15 +51,15 @@ const S = {
   },
   modal: {
     width: '100%', maxWidth: 460,
-    backgroundColor: '#13161D',
-    border: '1px solid rgba(255,255,255,0.1)',
+    backgroundColor: 'var(--c-13161d)',
+    border: '1px solid rgba(var(--fg-rgb),0.1)',
     borderRadius: 16,
     display: 'flex', flexDirection: 'column' as const,
     maxHeight: '92vh',
   },
   header: {
     padding: '18px 24px',
-    borderBottom: '1px solid rgba(255,255,255,0.07)',
+    borderBottom: '1px solid rgba(var(--fg-rgb),0.07)',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     flexShrink: 0,
   },
@@ -71,32 +71,32 @@ const S = {
   },
   footer: {
     padding: '16px 24px',
-    borderTop: '1px solid rgba(255,255,255,0.07)',
+    borderTop: '1px solid rgba(var(--fg-rgb),0.07)',
     display: 'flex', gap: 10, flexShrink: 0,
   },
   label: {
-    display: 'block', fontSize: 12, color: '#8a909b',
+    display: 'block', fontSize: 12, color: 'var(--c-8a909b)',
     marginBottom: 7, fontWeight: 500,
   },
   input: {
     display: 'block', width: '100%', boxSizing: 'border-box' as const,
-    padding: '9px 12px', fontSize: 13, color: '#E8EAF0',
-    backgroundColor: '#1A1D26',
-    border: '1px solid rgba(255,255,255,0.1)',
+    padding: '9px 12px', fontSize: 13, color: 'var(--c-e8eaf0)',
+    backgroundColor: 'var(--c-1a1d26)',
+    border: '1px solid rgba(var(--fg-rgb),0.1)',
     borderRadius: 8, outline: 'none',
   },
   select: {
     display: 'block', width: '100%', boxSizing: 'border-box' as const,
-    padding: '9px 12px', fontSize: 13, color: '#E8EAF0',
-    backgroundColor: '#1A1D26',
-    border: '1px solid rgba(255,255,255,0.1)',
+    padding: '9px 12px', fontSize: 13, color: 'var(--c-e8eaf0)',
+    backgroundColor: 'var(--c-1a1d26)',
+    border: '1px solid rgba(var(--fg-rgb),0.1)',
     borderRadius: 8, outline: 'none', cursor: 'pointer',
   },
   lockedInput: {
     display: 'block', width: '100%', boxSizing: 'border-box' as const,
-    padding: '9px 12px', fontSize: 13, color: '#555b6b',
-    backgroundColor: '#111318',
-    border: '1px solid rgba(255,255,255,0.05)',
+    padding: '9px 12px', fontSize: 13, color: 'var(--c-555b6b)',
+    backgroundColor: 'var(--c-111318)',
+    border: '1px solid rgba(var(--fg-rgb),0.05)',
     borderRadius: 8,
   },
   btnPrimary: {
@@ -106,17 +106,17 @@ const S = {
   },
   btnSecondary: {
     flex: 1, padding: '10px 0', fontSize: 13,
-    color: '#8a909b', backgroundColor: '#1A1D26',
-    border: '1px solid rgba(255,255,255,0.07)', borderRadius: 9, cursor: 'pointer',
+    color: 'var(--c-8a909b)', backgroundColor: 'var(--c-1a1d26)',
+    border: '1px solid rgba(var(--fg-rgb),0.07)', borderRadius: 9, cursor: 'pointer',
   },
   sectionTitle: {
     fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-    color: '#3d4250', textTransform: 'uppercase' as const,
+    color: 'var(--c-3d4250)', textTransform: 'uppercase' as const,
     marginBottom: 12,
   },
   row2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
   error: {
-    padding: '10px 14px', fontSize: 12, color: '#f87171',
+    padding: '10px 14px', fontSize: 12, color: 'var(--c-f87171)',
     backgroundColor: 'rgba(248,81,73,0.09)',
     border: '1px solid rgba(248,81,73,0.2)', borderRadius: 8,
   },
@@ -363,7 +363,7 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
 
         {/* Header */}
         <div style={S.header}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#E8EAF0' }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-e8eaf0)' }}>
             {isEdit ? `Edit - ${tool!.name}` : 'Add Tool'}
           </span>
           <button onClick={onClose} type="button"
@@ -378,8 +378,8 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
           {/* ── Alert banner (edit only) ─────────────────────────────── */}
           {isEdit && tool?.alert && (
             <div style={{ padding: '10px 14px', backgroundColor: 'rgba(248,81,73,0.08)', border: '1px solid rgba(248,81,73,0.22)', borderRadius: 9 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#F85149', marginBottom: 3 }}>Alert Active</div>
-              <div style={{ fontSize: 12, color: '#b06060' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-f85149)', marginBottom: 3 }}>Alert Active</div>
+              <div style={{ fontSize: 12, color: 'var(--c-b06060)' }}>
                 Threshold of {tool.alertThresholdPct}% has been breached - currently at {tool.barPct}% used.
               </div>
             </div>
@@ -478,14 +478,14 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
                         <button key={m} type="button" onClick={() => { setMode(m); setFetchStatus('idle'); setLimits(null); }}
                           style={{
                             padding: '11px 14px', textAlign: 'left',
-                            backgroundColor: on ? 'rgba(94,106,210,0.13)' : '#161921',
-                            border: on ? '1.5px solid rgba(94,106,210,0.55)' : '1.5px solid rgba(255,255,255,0.07)',
+                            backgroundColor: on ? 'rgba(94,106,210,0.13)' : 'var(--c-161921)',
+                            border: on ? '1.5px solid rgba(94,106,210,0.55)' : '1.5px solid rgba(var(--fg-rgb),0.07)',
                             borderRadius: 10, cursor: 'pointer',
                           }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: on ? '#9aa2ef' : '#7a8090', marginBottom: 3 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: on ? 'var(--c-9aa2ef)' : 'var(--c-7a8090)', marginBottom: 3 }}>
                             {m === 'api' ? 'Connect account' : 'Manual setup'}
                           </div>
-                          <div style={{ fontSize: 11, color: on ? '#5b6280' : '#3d4250' }}>
+                          <div style={{ fontSize: 11, color: on ? 'var(--c-5b6280)' : 'var(--c-3d4250)' }}>
                             {m === 'api' ? 'API key or service account' : 'Enter budget & limits yourself'}
                           </div>
                         </button>
@@ -497,7 +497,7 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
 
               {/* Connect account panel - only reachable when selectedIntegration.hasApi */}
               {selectedIntegration?.hasApi && mode === 'api' && (
-                <div style={{ backgroundColor: '#0f1116', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '16px 16px 14px' }}>
+                <div style={{ backgroundColor: 'var(--c-0f1116)', border: '1px solid rgba(var(--fg-rgb),0.08)', borderRadius: 10, padding: '16px 16px 14px' }}>
                   {isMultiField ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 10 }}>
                       <div>
@@ -555,7 +555,7 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
                       disabled={!connectKeyReady || fetchStatus === 'loading'}
                       style={{
                         padding: '8px 16px', fontSize: 12, fontWeight: 600,
-                        color: fetchStatus === 'ok' ? '#3FB950' : '#fff',
+                        color: fetchStatus === 'ok' ? 'var(--c-3fb950)' : '#fff',
                         backgroundColor: fetchStatus === 'ok' ? 'rgba(63,185,80,0.12)' : '#5E6AD2',
                         border: fetchStatus === 'ok' ? '1px solid rgba(63,185,80,0.35)' : 'none',
                         borderRadius: 7, cursor: (!connectKeyReady || fetchStatus === 'loading') ? 'not-allowed' : 'pointer',
@@ -567,12 +567,12 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
                           ? '✓ Connected'
                           : selectedIntegration.hasLimits ? 'Fetch limits' : 'Connect'}
                     </button>
-                    <span style={{ fontSize: 11, color: '#333740' }}>
+                    <span style={{ fontSize: 11, color: 'var(--c-333740)' }}>
                       {selectedIntegration.helpText}
                     </span>
                   </div>
                   {fetchStatus === 'err' && (
-                    <div style={{ marginTop: 10, fontSize: 12, color: '#f87171', padding: '8px 10px', backgroundColor: 'rgba(248,81,73,0.07)', borderRadius: 7 }}>
+                    <div style={{ marginTop: 10, fontSize: 12, color: 'var(--c-f87171)', padding: '8px 10px', backgroundColor: 'rgba(248,81,73,0.07)', borderRadius: 7 }}>
                       {fetchError}
                     </div>
                   )}
@@ -584,7 +584,7 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
                   )}
                   {fetchStatus === 'ok' && !limits && (!selectedIntegration.hasLimits || selectedIntegration.limitsOptional) && (
                     <div style={{ marginTop: 12 }}>
-                      <div style={{ fontSize: 10.5, color: '#3d4250', marginBottom: 8 }}>
+                      <div style={{ fontSize: 10.5, color: 'var(--c-3d4250)', marginBottom: 8 }}>
                         {selectedIntegration.limitsOptional
                           ? `No budget found on your ${selectedIntegration.label} account - enter one manually below, or configure one there to auto-fill this next time.`
                           : `${selectedIntegration.label} doesn't expose a spend limit via API - enter your budget manually.`}
@@ -631,18 +631,18 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
             <div>
               <div style={S.sectionTitle}>Budget & limits</div>
               {hasIntegration && (
-                <div style={{ backgroundColor: '#0d130e', border: '1px solid rgba(63,185,80,0.18)', borderRadius: 10, padding: '12px 16px', marginBottom: 12 }}>
+                <div style={{ backgroundColor: 'var(--c-0d130e)', border: '1px solid rgba(63,185,80,0.18)', borderRadius: 10, padding: '12px 16px', marginBottom: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#3FB950', display: 'inline-block' }} />
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#5fba6f' }}>Connected to {provider}</span>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: 'var(--c-3fb950)', display: 'inline-block' }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-5fba6f)' }}>Connected to {provider}</span>
                     </div>
                     <button type="button" onClick={refreshLimits} disabled={refreshing}
-                      style={{ fontSize: 11, color: '#4a5060', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                      style={{ fontSize: 11, color: 'var(--c-4a5060)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                       {refreshing ? 'Refreshing…' : '↻ Refresh limits'}
                     </button>
                   </div>
-                  {refreshErr && <div style={{ fontSize: 11, color: '#f87171', marginTop: 6 }}>{refreshErr}</div>}
+                  {refreshErr && <div style={{ fontSize: 11, color: 'var(--c-f87171)', marginTop: 6 }}>{refreshErr}</div>}
                   {refreshed && (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
                       <LimitTile label="Budget cap" main={`$${refreshed.computeHardLimitUSD.toLocaleString('en-US')}`} sub="hard limit" />
@@ -748,7 +748,7 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
                   />
                   <div style={{
                     padding: '9px 12px', fontSize: 13, color: '#5E6AD2', fontWeight: 500,
-                    backgroundColor: '#13161D', border: '1px solid rgba(255,255,255,0.1)',
+                    backgroundColor: 'var(--c-13161d)', border: '1px solid rgba(var(--fg-rgb),0.1)',
                     borderRadius: '0 8px 8px 0', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center',
                   }}>
                     @life180labs.com
@@ -787,10 +787,10 @@ export function AddToolModal({ onClose, onCreated, tool, connectedProviders }: P
 /* ─── LimitTile sub-component ────────────────────────────────────────────── */
 function LimitTile({ label, main, sub }: { label: string; main: string; sub: string }) {
   return (
-    <div style={{ padding: '10px 12px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8 }}>
-      <div style={{ fontSize: 11, color: '#44495a', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#a8c890' }}>{main}</div>
-      <div style={{ fontSize: 11, color: '#3d4555', marginTop: 2 }}>{sub}</div>
+    <div style={{ padding: '10px 12px', backgroundColor: 'rgba(var(--fg-rgb),0.03)', border: '1px solid rgba(var(--fg-rgb),0.06)', borderRadius: 8 }}>
+      <div style={{ fontSize: 11, color: 'var(--c-44495a)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--c-a8c890)' }}>{main}</div>
+      <div style={{ fontSize: 11, color: 'var(--c-3d4555)', marginTop: 2 }}>{sub}</div>
     </div>
   );
 }

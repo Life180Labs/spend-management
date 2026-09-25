@@ -1,4 +1,4 @@
-import { computeRow, Tool } from './compute-tool-row.util';
+import { computeRow, monthsInPeriod, Tool } from './compute-tool-row.util';
 
 const baseTool: Tool = {
   id: 't1', name: 'Hostinger', vendor: 'Hostinger', category: 'HOSTING',
@@ -58,5 +58,57 @@ describe('computeRow - other payment kinds unaffected (regression)', () => {
   it('NOBUDGET still labels the Payment badge "No budget"', () => {
     const nobudget: Tool = { ...baseTool, paymentKind: 'NOBUDGET' };
     expect(computeRow(nobudget, fmtAmt).payLabel).toBe('No budget');
+  });
+});
+
+describe('computeRow - Budget Status follows the Dashboard period filter', () => {
+  const prepaid: Tool = {
+    ...baseTool, name: 'Google Cloud', paymentKind: 'PREPAID',
+    usedAmount: 0.39, capAmount: 5, barPct: 8, alertThresholdPct: 50, alert: false, statusSub: '8% used',
+  };
+  const mosub: Tool = { ...baseTool, name: 'Claude', paymentKind: 'MOSUB', monthlyAmount: 20, statusSub: 'cycle 0%' };
+
+  it('keeps the live usedAmount/barPct/alert when no period is given ("This month")', () => {
+    const row = computeRow({ ...prepaid, alert: true }, fmtAmt);
+    expect(row.statusMain).toBe('$0.39 / $5');
+    expect(row.barPct).toBe(8);
+    expect(row.statusSub).toBe('8% used');
+    expect(row.budgetAlert).toBe(true);
+  });
+
+  it('usage-based: shows the period spend against the monthly cap for a single-month period (Last month)', () => {
+    const row = computeRow(prepaid, fmtAmt, { months: 1, amount: 4 });
+    expect(row.statusMain).toBe('$4 / $5');
+    expect(row.barPct).toBe(80);
+    expect(row.statusSub).toBe('80% used');
+    expect(row.budgetAlert).toBe(true); // 80% ≥ 50% threshold in that period
+  });
+
+  it('usage-based: scales the cap by the number of months for a multi-month period', () => {
+    const row = computeRow(prepaid, fmtAmt, { months: 3, amount: 3 });
+    expect(row.statusMain).toBe('$3 / $15');
+    expect(row.barPct).toBe(20);
+    expect(row.budgetAlert).toBe(false);
+  });
+
+  it('does not carry the live alert into a period where the threshold was not breached', () => {
+    const row = computeRow({ ...prepaid, alert: true, barPct: 90 }, fmtAmt, { months: 1, amount: 1 });
+    expect(row.barPct).toBe(20);
+    expect(row.budgetAlert).toBe(false);
+  });
+
+  it('subscriptions: shows the period total instead of the per-month rate', () => {
+    expect(computeRow(mosub, fmtAmt, { months: 3, amount: 60 }).statusMain).toBe('$60 / 3 mo');
+    expect(computeRow(mosub, fmtAmt, { months: 1, amount: 20 }).statusMain).toBe('$20 / mo');
+    expect(computeRow(mosub, fmtAmt).statusMain).toBe('$20 / mo');
+  });
+
+  it('monthsInPeriod counts the in-progress month, matching the backend window', () => {
+    const sept = new Date(2026, 8, 25);
+    expect(monthsInPeriod('this_month', sept)).toBe(1);
+    expect(monthsInPeriod('last_month', sept)).toBe(1);
+    expect(monthsInPeriod('this_quarter', sept)).toBe(3);
+    expect(monthsInPeriod('this_quarter', new Date(2026, 9, 5))).toBe(1);
+    expect(monthsInPeriod('year_to_date', sept)).toBe(9);
   });
 });

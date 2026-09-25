@@ -90,12 +90,12 @@ function fmtFetchedAt(d: Date): string {
 }
 
 const fieldStyle: React.CSSProperties = {
-  width: '100%', boxSizing: 'border-box', padding: '9px 12px', fontSize: 13, color: '#E8EAF0',
-  backgroundColor: '#1A1D26', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 9,
+  width: '100%', boxSizing: 'border-box', padding: '9px 12px', fontSize: 13, color: 'var(--c-e8eaf0)',
+  backgroundColor: 'var(--c-1a1d26)', border: '1px solid rgba(var(--fg-rgb),0.1)', borderRadius: 9,
   outline: 'none',
 };
 const labelStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#767b86',
+  display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--c-767b86)',
   marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em',
 };
 
@@ -220,26 +220,26 @@ export default function UsageHistoryPage() {
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 760 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(94,106,210,.14)', color: '#9aa2ef', flexShrink: 0 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(94,106,210,.14)', color: 'var(--c-9aa2ef)', flexShrink: 0 }}>
           <History size={17} />
         </div>
         <div>
-          <h1 style={{ fontSize: 18, fontWeight: 660, color: '#F2F3F5', letterSpacing: '-.02em', margin: '0 0 2px' }}>Usage History</h1>
-          <p style={{ fontSize: 12, color: '#767b86', margin: 0 }}>
+          <h1 style={{ fontSize: 18, fontWeight: 660, color: 'var(--c-f2f3f5)', letterSpacing: '-.02em', margin: '0 0 2px' }}>Usage History</h1>
+          <p style={{ fontSize: 12, color: 'var(--c-767b86)', margin: 0 }}>
             Spend pulled directly from the provider for any past period.
           </p>
         </div>
       </div>
 
       {tools.length === 0 ? (
-        <div style={{ background: '#0E1014', border: '1px solid #1A1D24', borderRadius: 14, padding: '36px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: 13, color: '#9aa0ab', marginBottom: 4 }}>No tools with a live integration yet</div>
-          <div style={{ fontSize: 12, color: '#5e636e' }}>Connect a tool (e.g. Railway) from the dashboard to see its usage history here.</div>
+        <div style={{ background: 'var(--c-0e1014)', border: '1px solid var(--c-1a1d24)', borderRadius: 14, padding: '36px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: 13, color: 'var(--c-9aa0ab)', marginBottom: 4 }}>No tools with a live integration yet</div>
+          <div style={{ fontSize: 12, color: 'var(--c-5e636e)' }}>Connect a tool (e.g. Railway) from the dashboard to see its usage history here.</div>
         </div>
       ) : (
         <>
           {/* Filters */}
-          <div style={{ background: '#0E1014', border: '1px solid #1A1D24', borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ background: 'var(--c-0e1014)', border: '1px solid var(--c-1a1d24)', borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: period === 'custom' ? '1fr 2fr 1fr 1fr' : '1fr 2.4fr', gap: 14, alignItems: 'end' }}>
               <div>
                 <label style={labelStyle}>Tool</label>
@@ -268,9 +268,9 @@ export default function UsageHistoryPage() {
                         onClick={() => setPeriod(p.key)}
                         style={{
                           padding: '9px 8px', fontSize: 12, fontWeight: 600, textAlign: 'center',
-                          backgroundColor: on ? 'rgba(94,106,210,0.16)' : '#161921',
-                          border: on ? '1.5px solid rgba(94,106,210,0.55)' : '1.5px solid rgba(255,255,255,0.07)',
-                          color: on ? '#9aa2ef' : '#7a8090',
+                          backgroundColor: on ? 'rgba(94,106,210,0.16)' : 'var(--c-161921)',
+                          border: on ? '1.5px solid rgba(94,106,210,0.55)' : '1.5px solid rgba(var(--fg-rgb),0.07)',
+                          color: on ? 'var(--c-9aa2ef)' : 'var(--c-7a8090)',
                           borderRadius: 9, cursor: 'pointer', transition: 'background .15s, border-color .15s',
                         }}
                       >
@@ -305,26 +305,26 @@ export default function UsageHistoryPage() {
           </div>
 
           {/* Result card */}
-          <div style={{ background: '#0E1014', border: '1px solid #1A1D24', borderRadius: 14, padding: '24px 26px' }}>
+          <div style={{ background: 'var(--c-0e1014)', border: '1px solid var(--c-1a1d24)', borderRadius: 14, padding: '24px 26px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 600, color: '#cfd3da' }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--c-cfd3da)' }}>
                     {selectedTool ? `${selectedTool.name} · ${selectedTool.integration?.provider}` : ''}
                   </span>
                   {hasLag && (
                     <span
                       title="Batch-exported data (e.g. BigQuery Billing Export) - hours to a few days behind, never real-time"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 20, background: 'rgba(245,166,35,.1)', border: '1px solid rgba(245,166,35,.28)', color: '#d99e3e', fontSize: 9.5, fontWeight: 600, letterSpacing: '.03em' }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 20, background: 'rgba(245,166,35,.1)', border: '1px solid rgba(245,166,35,.28)', color: 'var(--c-d99e3e)', fontSize: 9.5, fontWeight: 600, letterSpacing: '.03em' }}
                     >
                       <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'currentColor', flexShrink: 0, display: 'inline-block' }} />
                       Periodic
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 11, color: '#5e636e' }}>{fmtRangeLabel(activeRange.from, activeRange.to)}</div>
+                <div style={{ fontSize: 11, color: 'var(--c-5e636e)' }}>{fmtRangeLabel(activeRange.from, activeRange.to)}</div>
                 {syncedAt && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, fontSize: 10.5, color: '#4a4f59' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, fontSize: 10.5, color: 'var(--c-4a4f59)' }}>
                     <span>{isCurrent ? 'Synced' : hasLag ? 'Queried' : 'Live read'} {fmtFetchedAt(syncedAt)}</span>
                     <button
                       type="button"
@@ -334,7 +334,7 @@ export default function UsageHistoryPage() {
                       style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         width: 16, height: 16, padding: 0, border: 'none', borderRadius: 4,
-                        background: 'transparent', color: '#5e636e', cursor: loading ? 'default' : 'pointer',
+                        background: 'transparent', color: 'var(--c-5e636e)', cursor: loading ? 'default' : 'pointer',
                       }}
                     >
                       <RefreshCw size={10} className={loading ? 'animate-spin' : ''} />
@@ -342,7 +342,7 @@ export default function UsageHistoryPage() {
                   </div>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: 4, background: '#161921', borderRadius: 8, padding: 3, flexShrink: 0 }}>
+              <div style={{ display: 'flex', gap: 4, background: 'var(--c-161921)', borderRadius: 8, padding: 3, flexShrink: 0 }}>
                 {(['USD', 'INR'] as const).map((c) => (
                   <button
                     key={c}
@@ -355,7 +355,7 @@ export default function UsageHistoryPage() {
                     style={{
                       padding: '4px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: 'none', cursor: 'pointer',
                       background: currency === c ? '#5E6AD2' : 'transparent',
-                      color: currency === c ? '#fff' : '#7a8090',
+                      color: currency === c ? '#fff' : 'var(--c-7a8090)',
                     }}
                   >
                     {c === 'USD' ? '$ USD' : '₹ INR'}
@@ -366,24 +366,24 @@ export default function UsageHistoryPage() {
 
             <div style={{ marginTop: 18 }}>
               {loading ? (
-                <div style={{ fontSize: 32, fontWeight: 680, color: '#2a2d36', letterSpacing: '-.02em' }}>Loading…</div>
+                <div style={{ fontSize: 32, fontWeight: 680, color: 'var(--c-2a2d36)', letterSpacing: '-.02em' }}>Loading…</div>
               ) : error ? (
-                <div style={{ fontSize: 12.5, color: '#F85149', lineHeight: 1.5, maxWidth: 480 }}>{error}</div>
+                <div style={{ fontSize: 12.5, color: 'var(--c-f85149)', lineHeight: 1.5, maxWidth: 480 }}>{error}</div>
               ) : hasData ? (
-                <div style={{ fontSize: 38, fontWeight: 680, color: '#F2F3F5', letterSpacing: '-.02em', fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ fontSize: 38, fontWeight: 680, color: 'var(--c-f2f3f5)', letterSpacing: '-.02em', fontVariantNumeric: 'tabular-nums' }}>
                   {fmtAmt(total)}
                 </div>
               ) : isCurrent ? (
-                <div style={{ fontSize: 13, color: '#5e636e' }}>Not synced yet — connect the integration or wait for the next hourly sync.</div>
+                <div style={{ fontSize: 13, color: 'var(--c-5e636e)' }}>Not synced yet — connect the integration or wait for the next hourly sync.</div>
               ) : (
-                <div style={{ fontSize: 13, color: '#5e636e' }}>No data for this period.</div>
+                <div style={{ fontSize: 13, color: 'var(--c-5e636e)' }}>No data for this period.</div>
               )}
             </div>
 
             {/* CPU / Memory breakdown */}
             {hasData && breakdown.length > 0 && total > 0 && (
               <div style={{ marginTop: 22 }}>
-                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#4a4f59', marginBottom: 10 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--c-4a4f59)', marginBottom: 10 }}>
                   Where it came from
                 </div>
 
@@ -408,11 +408,11 @@ export default function UsageHistoryPage() {
                     return (
                       <div key={b.measurement} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ width: 8, height: 8, borderRadius: 999, background: meta.color, flexShrink: 0 }} />
-                        <Icon size={13} color="#6b707b" style={{ flexShrink: 0 }} />
-                        <span style={{ fontSize: 12.5, color: '#c2c6cf', fontWeight: 550, minWidth: 118 }}>{meta.label}</span>
-                        <span style={{ fontSize: 11.5, color: '#5e636e', flex: 1 }}>{rawHours} {meta.unit}</span>
-                        <span style={{ fontSize: 12.5, color: '#9aa0ab', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
-                        <span style={{ fontSize: 13, color: '#E8EAF0', fontWeight: 650, fontVariantNumeric: 'tabular-nums', minWidth: 70, textAlign: 'right' }}>
+                        <Icon size={13} color="var(--c-6b707b)" style={{ flexShrink: 0 }} />
+                        <span style={{ fontSize: 12.5, color: 'var(--c-c2c6cf)', fontWeight: 550, minWidth: 118 }}>{meta.label}</span>
+                        <span style={{ fontSize: 11.5, color: 'var(--c-5e636e)', flex: 1 }}>{rawHours} {meta.unit}</span>
+                        <span style={{ fontSize: 12.5, color: 'var(--c-9aa0ab)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
+                        <span style={{ fontSize: 13, color: 'var(--c-e8eaf0)', fontWeight: 650, fontVariantNumeric: 'tabular-nums', minWidth: 70, textAlign: 'right' }}>
                           {fmtAmt(b.amountUSD)}
                         </span>
                       </div>
@@ -426,7 +426,7 @@ export default function UsageHistoryPage() {
                 row shares one accent hue; bar length carries the comparison, not color. */}
             {hasData && byProject.length > 0 && total > 0 && (
               <div style={{ marginTop: 22 }}>
-                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#4a4f59', marginBottom: 10 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--c-4a4f59)', marginBottom: 10 }}>
                   By project
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -435,14 +435,14 @@ export default function UsageHistoryPage() {
                     return (
                       <div key={p.projectId}>
                         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 3 }}>
-                          <span style={{ fontSize: 12, color: '#c2c6cf', fontWeight: 550, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: 12, color: 'var(--c-c2c6cf)', fontWeight: 550, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {p.projectName}
                           </span>
-                          <span style={{ fontSize: 12, color: '#9aa0ab', fontWeight: 600, fontVariantNumeric: 'tabular-nums', flexShrink: 0, marginLeft: 10 }}>
+                          <span style={{ fontSize: 12, color: 'var(--c-9aa0ab)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', flexShrink: 0, marginLeft: 10 }}>
                             {fmtAmt(p.amountUSD)}
                           </span>
                         </div>
-                        <div style={{ height: 5, borderRadius: 999, background: '#1B1E26', overflow: 'hidden' }}>
+                        <div style={{ height: 5, borderRadius: 999, background: 'var(--c-1b1e26)', overflow: 'hidden' }}>
                           <div style={{ height: '100%', borderRadius: 999, width: `${Math.max(pct, p.amountUSD > 0 ? 1 : 0)}%`, background: '#5E6AD2' }} />
                         </div>
                       </div>
@@ -454,7 +454,7 @@ export default function UsageHistoryPage() {
                     type="button"
                     onClick={() => setShowAllProjects((v) => !v)}
                     style={{
-                      marginTop: 10, fontSize: 11.5, fontWeight: 600, color: '#7a8090',
+                      marginTop: 10, fontSize: 11.5, fontWeight: 600, color: 'var(--c-7a8090)',
                       background: 'none', border: 'none', cursor: 'pointer', padding: 0,
                     }}
                   >

@@ -69,8 +69,8 @@ function FinishingSignIn({ token, onFatalError }: { token: string; onFatalError:
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '30px 0' }}>
       <Spinner />
-      <div style={{ fontSize: 13.5, color: '#9aa0ab' }}>Finishing sign-in…</div>
-      <div style={{ fontSize: 11.5, color: '#5e636e', textAlign: 'center', maxWidth: 300 }}>
+      <div style={{ fontSize: 13.5, color: 'var(--c-9aa0ab)' }}>Finishing sign-in…</div>
+      <div style={{ fontSize: 11.5, color: 'var(--c-5e636e)', textAlign: 'center', maxWidth: 300 }}>
         This can take a little longer than usual right after a period of inactivity. Hang tight - it'll complete automatically.
       </div>
     </div>
@@ -88,10 +88,10 @@ function LoginCard() {
 
   if (pendingToken && !fatalError) {
     return (
-      <div style={{ width: 440, maxWidth: 'calc(100vw - 32px)', background: '#0F1116', border: '1px solid #1E212A', borderRadius: 18, padding: '38px 40px', boxShadow: '0 24px 64px rgba(0,0,0,.5)' }}>
+      <div style={{ width: 440, maxWidth: 'calc(100vw - 32px)', background: 'var(--c-0f1116)', border: '1px solid var(--c-1e212a)', borderRadius: 18, padding: '38px 40px', boxShadow: '0 24px 64px rgba(0,0,0,.5)' }}>
         <div style={{ marginBottom: 4 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#F2F3F5', letterSpacing: '-.02em', margin: '0 0 7px' }}>Welcome back</h1>
-          <p style={{ fontSize: 13.5, color: '#767b86', margin: 0 }}>Sign in with your company Google account.</p>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--c-f2f3f5)', letterSpacing: '-.02em', margin: '0 0 7px' }}>Welcome back</h1>
+          <p style={{ fontSize: 13.5, color: 'var(--c-767b86)', margin: 0 }}>Sign in with your company Google account.</p>
         </div>
         <FinishingSignIn token={pendingToken} onFatalError={setFatalError} />
       </div>
@@ -99,14 +99,14 @@ function LoginCard() {
   }
 
   return (
-    <div style={{ width: 440, maxWidth: 'calc(100vw - 32px)', background: '#0F1116', border: '1px solid #1E212A', borderRadius: 18, padding: '38px 40px', boxShadow: '0 24px 64px rgba(0,0,0,.5)' }}>
+    <div style={{ width: 440, maxWidth: 'calc(100vw - 32px)', background: 'var(--c-0f1116)', border: '1px solid var(--c-1e212a)', borderRadius: 18, padding: '38px 40px', boxShadow: '0 24px 64px rgba(0,0,0,.5)' }}>
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#F2F3F5', letterSpacing: '-.02em', margin: '0 0 7px' }}>Welcome back</h1>
-        <p style={{ fontSize: 13.5, color: '#767b86', margin: 0 }}>Sign in with your company Google account.</p>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--c-f2f3f5)', letterSpacing: '-.02em', margin: '0 0 7px' }}>Welcome back</h1>
+        <p style={{ fontSize: 13.5, color: 'var(--c-767b86)', margin: 0 }}>Sign in with your company Google account.</p>
       </div>
 
       {fatalError && (
-        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 9, background: 'rgba(248,81,73,.1)', border: '1px solid rgba(248,81,73,.25)', fontSize: 13, color: '#F85149' }}>
+        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 9, background: 'rgba(248,81,73,.1)', border: '1px solid rgba(248,81,73,.25)', fontSize: 13, color: 'var(--c-f85149)' }}>
           {fatalError === 'oauth_failed' ? 'Sign-in failed. Please try again.' : fatalError}
         </div>
       )}
@@ -119,9 +119,9 @@ function LoginCard() {
         Continue with Google
       </button>
 
-      <div style={{ textAlign: 'center', fontSize: 12, color: '#5e636e', lineHeight: 1.5 }}>
+      <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--c-5e636e)', lineHeight: 1.5 }}>
         By continuing, you agree to your organization's access policy.<br />
-        <span style={{ color: '#4a5169' }}>SSO configured for Life180 Labs</span>
+        <span style={{ color: 'var(--c-4a5169)' }}>SSO configured for Life180 Labs</span>
       </div>
     </div>
   );
@@ -129,20 +129,20 @@ function LoginCard() {
 
 export default function LoginPage() {
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0A0B0E', flexDirection: 'column', gap: 24 }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--c-0a0b0e)', flexDirection: 'column', gap: 24 }}>
       {/* Brand */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ width: 34, height: 34, borderRadius: 9, background: '#5E6AD2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="6.5" width="3" height="8" rx="1.2" fill="#fff"/><rect x="6.5" y="2.5" width="3" height="12" rx="1.2" fill="#fff" opacity=".82"/><rect x="11.5" y="9" width="3" height="5.5" rx="1.2" fill="#fff" opacity=".64"/></svg>
         </div>
         <div>
-          <div style={{ fontSize: 14.5, fontWeight: 680, color: '#F2F3F5', letterSpacing: '-.01em' }}>Spend Management</div>
+          <div style={{ fontSize: 14.5, fontWeight: 680, color: 'var(--c-f2f3f5)', letterSpacing: '-.01em' }}>Spend Management</div>
           <div style={{ fontSize: 11, color: '#5E6AD2', fontWeight: 500 }}>Life180 Labs</div>
         </div>
       </div>
 
       <Suspense fallback={
-        <div style={{ width: 440, maxWidth: 'calc(100vw - 32px)', background: '#0F1116', border: '1px solid #1E212A', borderRadius: 18, padding: '38px 40px' }}>
+        <div style={{ width: 440, maxWidth: 'calc(100vw - 32px)', background: 'var(--c-0f1116)', border: '1px solid var(--c-1e212a)', borderRadius: 18, padding: '38px 40px' }}>
           <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid #5E6AD2', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
           </div>

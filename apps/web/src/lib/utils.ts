@@ -19,14 +19,14 @@ export function initials(name: string): string {
 }
 
 export const STATUS_COLORS: Record<string, string> = {
-  DRAFT: '#9aa0ab',
+  DRAFT: 'var(--c-9aa0ab)',
   SUBMITTED: '#0EA5E9',
-  PENDING_APPROVAL: '#F5A623',
-  APPROVED: '#3FB950',
-  REJECTED: '#F85149',
+  PENDING_APPROVAL: 'var(--c-f5a623)',
+  APPROVED: 'var(--c-3fb950)',
+  REJECTED: 'var(--c-f85149)',
   MORE_INFO_NEEDED: '#E0529C',
-  CANCELLED: '#6B7280',
-  CLOSED: '#3FB950',
-  PENDING: '#F5A623',
-  PAID: '#3FB950',
+  CANCELLED: 'var(--c-6b7280)',
+  CLOSED: 'var(--c-3fb950)',
+  PENDING: 'var(--c-f5a623)',
+  PAID: 'var(--c-3fb950)',
 };

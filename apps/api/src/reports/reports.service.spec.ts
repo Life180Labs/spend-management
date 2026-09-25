@@ -105,4 +105,68 @@ describe('ReportsService', () => {
       }
     });
   });
+
+  describe('billingHistory', () => {
+    function monthsAgo(n: number): string {
+      const now = new Date();
+      const d = new Date(now.getFullYear(), now.getMonth() - n, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    it('backfills a MOSUB tool\'s flat rate for a past month with no billing record yet (regression: the month vanished entirely from Reports/Billing History instead of showing the tool\'s monthly fee)', async () => {
+      prisma.tool.findMany.mockImplementation(({ where }: any) =>
+        where.paymentKind === 'MOSUB'
+          ? [{
+            id: 't1', name: 'Namecheap', category: 'OTHER', monoInitials: 'NC', monoBgColor: '#000',
+            paymentKind: 'MOSUB', billingCycle: 'MONTHLY', monthlyAmount: 10, usedAmount: 0,
+            renewalDate: null, createdAt: new Date(monthsAgo(6)),
+          }]
+          : [],
+      );
+
+      const { items } = await service.billingHistory('org1', {});
+      const backfilled = items.find((r: any) => r.toolId === 't1' && r.monthKey === monthsAgo(1));
+      expect(backfilled?.amount).toBe(10);
+      expect(backfilled?.status).toBe('PAID'); // auto-renewing subscription in a closed month - not awaiting payment
+    });
+
+    it('does not duplicate a month that already has a real billing record', async () => {
+      prisma.billingRecord.findMany.mockResolvedValue([
+        {
+          id: 'r1', toolId: 't1', monthKey: monthsAgo(1), monthLabel: 'x', amount: 10, status: 'PAID',
+          tool: { name: 'Namecheap', monoInitials: 'NC', monoBgColor: '#000', category: 'OTHER', billingCycle: 'MONTHLY', renewalDate: null },
+          toolSnapshotJson: null,
+        },
+      ]);
+      prisma.tool.findMany.mockImplementation(({ where }: any) =>
+        where.paymentKind === 'MOSUB'
+          ? [{
+            id: 't1', name: 'Namecheap', category: 'OTHER', monoInitials: 'NC', monoBgColor: '#000',
+            paymentKind: 'MOSUB', billingCycle: 'MONTHLY', monthlyAmount: 10, usedAmount: 0,
+            renewalDate: null, createdAt: new Date(monthsAgo(6)),
+          }]
+          : [],
+      );
+
+      const { items } = await service.billingHistory('org1', {});
+      const rowsForMonth = items.filter((r: any) => r.toolId === 't1' && r.monthKey === monthsAgo(1));
+      expect(rowsForMonth).toHaveLength(1);
+      expect(rowsForMonth[0].status).toBe('PAID'); // the real record, not a synthesized one
+    });
+
+    it('does not backfill months before the tool existed', async () => {
+      prisma.tool.findMany.mockImplementation(({ where }: any) =>
+        where.paymentKind === 'MOSUB'
+          ? [{
+            id: 't1', name: 'New Tool', category: 'OTHER', monoInitials: 'NT', monoBgColor: '#000',
+            paymentKind: 'MOSUB', billingCycle: 'MONTHLY', monthlyAmount: 10, usedAmount: 0,
+            renewalDate: null, createdAt: new Date(), // created this month
+          }]
+          : [],
+      );
+
+      const { items } = await service.billingHistory('org1', {});
+      expect(items.filter((r: any) => r.toolId === 't1')).toHaveLength(0);
+    });
+  });
 });

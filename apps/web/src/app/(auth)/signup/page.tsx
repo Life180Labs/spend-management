@@ -33,21 +33,21 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#0D0F14' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--c-0d0f14)' }}>
       <div
         className="w-full max-w-sm rounded-2xl p-8"
-        style={{ background: '#13161D', border: '1px solid rgba(255,255,255,0.07)' }}
+        style={{ background: 'var(--c-13161d)', border: '1px solid rgba(var(--fg-rgb),0.07)' }}
       >
         <div className="flex items-center gap-2 mb-8">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{ background: '#5E6AD2' }}>SM</div>
-          <span className="font-semibold text-[#F0F0F0]">Spend Management</span>
+          <span className="font-semibold text-[var(--c-f0f0f0)]">Spend Management</span>
         </div>
 
-        <h1 className="text-xl font-semibold text-[#F0F0F0] mb-1">Create account</h1>
-        <p className="text-sm text-[#9aa0ab] mb-6">Set up your workspace in seconds</p>
+        <h1 className="text-xl font-semibold text-[var(--c-f0f0f0)] mb-1">Create account</h1>
+        <p className="text-sm text-[var(--c-9aa0ab)] mb-6">Set up your workspace in seconds</p>
 
         {error && (
-          <div className="mb-4 p-3 rounded-lg text-sm text-[#F85149]" style={{ background: 'rgba(248,81,73,0.1)' }}>
+          <div className="mb-4 p-3 rounded-lg text-sm text-[var(--c-f85149)]" style={{ background: 'rgba(248,81,73,0.1)' }}>
             {error}
           </div>
         )}
@@ -59,13 +59,13 @@ export default function SignupPage() {
             { label: 'Company name', key: 'orgName', type: 'text', placeholder: 'Acme Corp (optional)' },
           ].map(({ label, key, type, placeholder }) => (
             <div key={key}>
-              <label className="block text-xs text-[#9aa0ab] mb-1.5 font-medium">{label}</label>
+              <label className="block text-xs text-[var(--c-9aa0ab)] mb-1.5 font-medium">{label}</label>
               <input
                 type={type}
                 value={form[key as keyof typeof form]}
                 onChange={set(key as keyof typeof form)}
                 className="w-full px-3 py-2.5 text-sm rounded-lg"
-                style={{ background: '#1B1E26', border: '1px solid rgba(255,255,255,0.08)', color: '#F0F0F0' }}
+                style={{ background: 'var(--c-1b1e26)', border: '1px solid rgba(var(--fg-rgb),0.08)', color: 'var(--c-f0f0f0)' }}
                 placeholder={placeholder}
                 required={key !== 'orgName'}
               />
@@ -73,31 +73,31 @@ export default function SignupPage() {
           ))}
 
           <div>
-            <label className="block text-xs text-[#9aa0ab] mb-1.5 font-medium">Password</label>
+            <label className="block text-xs text-[var(--c-9aa0ab)] mb-1.5 font-medium">Password</label>
             <div className="relative">
               <input
                 type={showPw ? 'text' : 'password'}
                 value={form.password}
                 onChange={set('password')}
                 className="w-full px-3 py-2.5 text-sm rounded-lg pr-10"
-                style={{ background: '#1B1E26', border: '1px solid rgba(255,255,255,0.08)', color: '#F0F0F0' }}
+                style={{ background: 'var(--c-1b1e26)', border: '1px solid rgba(var(--fg-rgb),0.08)', color: 'var(--c-f0f0f0)' }}
                 placeholder="Min 8 characters"
                 required
               />
-              <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9aa0ab]">
+              <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--c-9aa0ab)]">
                 {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs text-[#9aa0ab] mb-1.5 font-medium">Confirm password</label>
+            <label className="block text-xs text-[var(--c-9aa0ab)] mb-1.5 font-medium">Confirm password</label>
             <input
               type="password"
               value={form.confirm}
               onChange={set('confirm')}
               className="w-full px-3 py-2.5 text-sm rounded-lg"
-              style={{ background: '#1B1E26', border: '1px solid rgba(255,255,255,0.08)', color: '#F0F0F0' }}
+              style={{ background: 'var(--c-1b1e26)', border: '1px solid rgba(var(--fg-rgb),0.08)', color: 'var(--c-f0f0f0)' }}
               placeholder="Repeat password"
               required
             />
@@ -114,9 +114,9 @@ export default function SignupPage() {
           </button>
         </form>
 
-        <p className="text-center text-xs text-[#9aa0ab] mt-6">
+        <p className="text-center text-xs text-[var(--c-9aa0ab)] mt-6">
           Already have an account?{' '}
-          <Link href="/login" className="text-[#9aa2ef] hover:underline">Sign in</Link>
+          <Link href="/login" className="text-[var(--c-9aa2ef)] hover:underline">Sign in</Link>
         </p>
       </div>
     </div>

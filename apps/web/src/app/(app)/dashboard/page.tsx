@@ -7,7 +7,7 @@ import { exportToolsList } from '@/lib/excel';
 import { AddToolModal } from '@/components/tools/add-tool-modal';
 import { IntegrationModal } from '@/components/tools/integration-modal';
 import { matchProviderByVendor, INTEGRATION_PROVIDERS } from '@/lib/integration-providers';
-import { computeRow, type Tool } from '@/lib/compute-tool-row.util';
+import { computeRow, monthsInPeriod, type SpendPeriod, type Tool } from '@/lib/compute-tool-row.util';
 
 interface KPIs {
   totalMonthlySpend: number;
@@ -32,7 +32,6 @@ const TABS = [
 
 const GRID = 'minmax(200px,2fr) 1.05fr 0.95fr 1.75fr 1.15fr 1.6fr 1.05fr 60px';
 
-type SpendPeriod = 'this_month' | 'last_month' | 'this_quarter' | 'year_to_date';
 const PERIOD_OPTIONS: { key: SpendPeriod; label: string }[] = [
   { key: 'this_month', label: 'This month' },
   { key: 'last_month', label: 'Last month' },
@@ -116,13 +115,14 @@ export default function DashboardPage() {
     return () => clearInterval(id);
   }, [load]);
 
-  // Scopes the Total Monthly Spend KPI card AND the tools table's own "period
-  // spend" column below - the two always visibly sum to the same total, since
-  // both read from the same backend windowing (reports.service.ts). The rest
-  // of the dashboard (alerts, renewals, budget setup, cap/bar% in Budget
-  // Status) stays live/current-state regardless of the period picked here,
-  // since "active alert" or "upcoming renewal" isn't a past-tense concept the
-  // way a spend total is.
+  // Scopes the Total Monthly Spend KPI card, the tools table's own "period
+  // spend" column, AND the Budget Status column (spend vs. cap scaled to the
+  // period - see computeRow) - all read from the same backend windowing
+  // (reports.service.ts), so they always agree. The rest of the dashboard
+  // (alert KPI, row alert highlight, renewals, budget setup) stays
+  // live/current-state regardless of the period picked here, since "active
+  // alert" or "upcoming renewal" isn't a past-tense concept the way a spend
+  // total is.
   const loadPeriodSpend = useCallback(async (period: SpendPeriod) => {
     const [totalRes, byToolRes] = await Promise.all([
       api.get<{ total: number }>(`/reports/period-spend?period=${period}`),
@@ -164,31 +164,31 @@ export default function DashboardPage() {
       {/* Page header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 style={{ fontSize: 18, fontWeight: 660, color: '#F2F3F5', letterSpacing: '-.02em' }}>Spend Overview</h1>
-          <p style={{ fontSize: 12, color: '#767b86', marginTop: 3 }}>Monitor tool budgets, usage and alert thresholds across your stack.</p>
+          <h1 style={{ fontSize: 18, fontWeight: 660, color: 'var(--c-f2f3f5)', letterSpacing: '-.02em' }}>Spend Overview</h1>
+          <p style={{ fontSize: 12, color: 'var(--c-767b86)', marginTop: 3 }}>Monitor tool budgets, usage and alert thresholds across your stack.</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Period selector - scopes the Total Monthly Spend card only */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setPeriodMenuOpen((v) => !v)}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 12px', borderRadius: 9, background: 'transparent', border: '1px solid #1E212A', color: '#c2c6cf', fontSize: 12.5, fontWeight: 550, cursor: 'pointer' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 12px', borderRadius: 9, background: 'transparent', border: '1px solid var(--c-1e212a)', color: 'var(--c-c2c6cf)', fontSize: 12.5, fontWeight: 550, cursor: 'pointer' }}
             >
-              <Calendar size={13} style={{ color: '#6b707b' }} />
+              <Calendar size={13} style={{ color: 'var(--c-6b707b)' }} />
               {PERIOD_OPTIONS.find((p) => p.key === spendPeriod)?.label}
-              <ChevronDown size={13} style={{ color: '#6b707b' }} />
+              <ChevronDown size={13} style={{ color: 'var(--c-6b707b)' }} />
             </button>
             {periodMenuOpen && (
               <>
                 <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setPeriodMenuOpen(false)} />
-                <div style={{ position: 'absolute', top: '110%', left: 0, background: '#1B1E26', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '4px 0', zIndex: 50, minWidth: 180, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                <div style={{ position: 'absolute', top: '110%', left: 0, background: 'var(--c-1b1e26)', border: '1px solid rgba(var(--fg-rgb),0.1)', borderRadius: 10, padding: '4px 0', zIndex: 50, minWidth: 180, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
                   {PERIOD_OPTIONS.map((p) => {
                     const active = spendPeriod === p.key;
                     return (
                       <button
                         key={p.key}
                         onClick={() => { setSpendPeriod(p.key); setPeriodMenuOpen(false); }}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: active ? 600 : 500, background: 'transparent', border: 'none', cursor: 'pointer', color: active ? '#E6E8EC' : '#9aa0ab' }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: active ? 600 : 500, background: 'transparent', border: 'none', cursor: 'pointer', color: active ? 'var(--c-e6e8ec)' : 'var(--c-9aa0ab)' }}
                       >
                         {p.label}
                         {active && <Check size={13} style={{ color: '#5E6AD2' }} />}
@@ -200,9 +200,9 @@ export default function DashboardPage() {
             )}
           </div>
           {/* Currency toggle */}
-          <div style={{ display: 'flex', borderRadius: 8, border: '1px solid #1E212A', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', borderRadius: 8, border: '1px solid var(--c-1e212a)', overflow: 'hidden' }}>
             {(['USD', 'INR'] as const).map((c) => (
-              <button key={c} onClick={() => setCurrency(c)} style={{ padding: '6px 13px', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: currency === c ? '#5E6AD2' : 'transparent', color: currency === c ? '#fff' : '#6b707b', transition: 'all .15s' }}>
+              <button key={c} onClick={() => setCurrency(c)} style={{ padding: '6px 13px', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: currency === c ? '#5E6AD2' : 'transparent', color: currency === c ? '#fff' : 'var(--c-6b707b)', transition: 'all .15s' }}>
                 {c === 'INR' ? '₹ INR' : '$ USD'}
               </button>
             ))}
@@ -210,7 +210,7 @@ export default function DashboardPage() {
           <button
             onClick={() => exportToolsList(displayed, filter, currency, fxRate)}
             title="Download as Excel"
-            style={{ width: 34, height: 34, borderRadius: 9, background: 'transparent', border: '1px solid #1E212A', color: '#6b707b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            style={{ width: 34, height: 34, borderRadius: 9, background: 'transparent', border: '1px solid var(--c-1e212a)', color: 'var(--c-6b707b)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
           >
             <Download size={13} />
           </button>
@@ -224,68 +224,68 @@ export default function DashboardPage() {
       {kpis && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
           {/* Card 1: Total Monthly Spend */}
-          <div style={{ background: '#101218', border: '1px solid #1E212A', borderRadius: 14, padding: '18px 20px' }}>
+          <div style={{ background: 'var(--c-101218)', border: '1px solid var(--c-1e212a)', borderRadius: 14, padding: '18px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <span style={{ fontSize: 12, color: '#878c96', fontWeight: 500 }}>Total Monthly Spend</span>
+              <span style={{ fontSize: 12, color: 'var(--c-878c96)', fontWeight: 500 }}>Total Monthly Spend</span>
               <span style={{ color: '#5E6AD2', display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(94,106,210,.12)', fontSize: 16, fontWeight: 700 }}>
                 {currency === 'INR' ? '₹' : '$'}
               </span>
             </div>
-            <div style={{ fontSize: 28, fontWeight: 680, color: '#F2F3F5', letterSpacing: '-.02em', lineHeight: 1 }}>
+            <div style={{ fontSize: 28, fontWeight: 680, color: 'var(--c-f2f3f5)', letterSpacing: '-.02em', lineHeight: 1 }}>
               {makeFmt(currency, fxRate)(periodSpendTotal ?? kpis.totalMonthlySpend)}
             </div>
-            <div style={{ fontSize: 12, color: '#6b707b', marginTop: 11 }} title="A yearly subscription's cost is divided by 12 before being added to this total, so it reflects its true monthly rate.">
+            <div style={{ fontSize: 12, color: 'var(--c-6b707b)', marginTop: 11 }} title="A yearly subscription's cost is divided by 12 before being added to this total, so it reflects its true monthly rate.">
               {PERIOD_OPTIONS.find((p) => p.key === spendPeriod)?.label.toLowerCase()}{periodRangeSuffix(spendPeriod)} · yearly subscriptions pro-rated
             </div>
           </div>
 
           {/* Card 2: Tools Needing Budget Setup */}
-          <div style={{ background: 'linear-gradient(150deg,rgba(245,166,35,.09),#101218 60%)', border: '1px solid rgba(245,166,35,.35)', borderRadius: 14, padding: '18px 20px' }}>
+          <div style={{ background: 'linear-gradient(150deg,rgba(245,166,35,.09),var(--c-101218) 60%)', border: '1px solid rgba(245,166,35,.35)', borderRadius: 14, padding: '18px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <span style={{ fontSize: 12, color: '#d6a44e', fontWeight: 500 }}>Tools Needing Budget Setup</span>
-              <span style={{ color: '#F5A623', display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(245,166,35,.14)' }}>
+              <span style={{ fontSize: 12, color: 'var(--c-d6a44e)', fontWeight: 500 }}>Tools Needing Budget Setup</span>
+              <span style={{ color: 'var(--c-f5a623)', display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(245,166,35,.14)' }}>
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.2L14.5 13H1.5L8 2.2Z" /><line x1="8" y1="6.5" x2="8" y2="9.3" /><circle cx="8" cy="11.1" r=".35" fill="currentColor" /></svg>
               </span>
             </div>
-            <div style={{ fontSize: 28, fontWeight: 680, color: '#F5A623', letterSpacing: '-.02em', lineHeight: 1 }}>{kpis.noBudgetCount}</div>
-            <div style={{ fontSize: 12, color: '#8a7d5e', marginTop: 11 }}>{kpis.noBudgetCount > 0 ? `${noBudgetNames} - uncapped` : 'All tools are configured'}</div>
+            <div style={{ fontSize: 28, fontWeight: 680, color: 'var(--c-f5a623)', letterSpacing: '-.02em', lineHeight: 1 }}>{kpis.noBudgetCount}</div>
+            <div style={{ fontSize: 12, color: 'var(--c-8a7d5e)', marginTop: 11 }}>{kpis.noBudgetCount > 0 ? `${noBudgetNames} - uncapped` : 'All tools are configured'}</div>
           </div>
 
           {/* Card 3: Active Threshold Alerts */}
-          <div style={{ background: kpis.alertCount > 0 ? 'linear-gradient(150deg,rgba(248,81,73,.2),#101218 50%)' : '#101218', border: kpis.alertCount > 0 ? '2px solid #F85149' : '1px solid #1E212A', borderRadius: 14, padding: '18px 20px', boxShadow: kpis.alertCount > 0 ? '0 0 16px rgba(248,81,73,.2), inset 0 0 12px rgba(248,81,73,.08)' : 'none' }}>
+          <div style={{ background: kpis.alertCount > 0 ? 'linear-gradient(150deg,rgba(248,81,73,.2),var(--c-101218) 50%)' : 'var(--c-101218)', border: kpis.alertCount > 0 ? '2px solid var(--c-f85149)' : '1px solid var(--c-1e212a)', borderRadius: 14, padding: '18px 20px', boxShadow: kpis.alertCount > 0 ? '0 0 16px rgba(248,81,73,.2), inset 0 0 12px rgba(248,81,73,.08)' : 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <span style={{ fontSize: 12, color: '#878c96', fontWeight: 500 }}>Active Threshold Alerts</span>
-              <span style={{ color: '#F85149', display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(248,81,73,.12)', animation: 'pulseRing 2.4s ease-in-out infinite' }}>
+              <span style={{ fontSize: 12, color: 'var(--c-878c96)', fontWeight: 500 }}>Active Threshold Alerts</span>
+              <span style={{ color: 'var(--c-f85149)', display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(248,81,73,.12)', animation: 'pulseRing 2.4s ease-in-out infinite' }}>
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 2.5c-2 0-3.2 1.4-3.2 3.3 0 2.5-1 3.5-1.4 3.9-.1.2.1.4.4.4h8.4c.3 0 .5-.2.4-.4-.4-.4-1.4-1.4-1.4-3.9C11.2 3.9 10 2.5 8 2.5Z" strokeLinejoin="round" /><path d="M6.7 12.2a1.4 1.4 0 0 0 2.6 0" strokeLinecap="round" /></svg>
               </span>
             </div>
-            <div style={{ fontSize: 28, fontWeight: 680, color: '#F2F3F5', letterSpacing: '-.02em', lineHeight: 1 }}>{kpis.alertCount}</div>
+            <div style={{ fontSize: 28, fontWeight: 680, color: 'var(--c-f2f3f5)', letterSpacing: '-.02em', lineHeight: 1 }}>{kpis.alertCount}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 11, fontSize: 12 }}>
               {kpis.alertCount > 0 ? (
-                <><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F85149', flexShrink: 0, display: 'inline-block' }} /><span style={{ color: '#878c96' }}>Scroll down · alerts highlighted in list</span></>
-              ) : <span style={{ color: '#6b707b' }}>No active alerts</span>}
+                <><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--c-f85149)', flexShrink: 0, display: 'inline-block' }} /><span style={{ color: 'var(--c-878c96)' }}>Scroll down · alerts highlighted in list</span></>
+              ) : <span style={{ color: 'var(--c-6b707b)' }}>No active alerts</span>}
             </div>
           </div>
 
           {/* Card 4: Upcoming Renewals */}
-          <div style={{ background: '#101218', border: '1px solid #1E212A', borderRadius: 14, padding: '18px 20px' }}>
+          <div style={{ background: 'var(--c-101218)', border: '1px solid var(--c-1e212a)', borderRadius: 14, padding: '18px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <span style={{ fontSize: 12, color: '#878c96', fontWeight: 500 }}>Upcoming Renewals</span>
+              <span style={{ fontSize: 12, color: 'var(--c-878c96)', fontWeight: 500 }}>Upcoming Renewals</span>
               <span style={{ color: '#5E6AD2', display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(94,106,210,.12)' }}>
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2.5" y="3" width="11" height="11" rx="2" /><line x1="2.5" y1="6.2" x2="13.5" y2="6.2" /><line x1="5.5" y1="1.5" x2="5.5" y2="4" /><line x1="10.5" y1="1.5" x2="10.5" y2="4" /></svg>
               </span>
             </div>
-            <div style={{ fontSize: 28, fontWeight: 680, color: '#F2F3F5', letterSpacing: '-.02em', lineHeight: 1 }}>{kpis?.renewalCount ?? 0}</div>
-            <div style={{ fontSize: 12, color: '#6b707b', marginTop: 11 }}>{nearestRenewalText}</div>
+            <div style={{ fontSize: 28, fontWeight: 680, color: 'var(--c-f2f3f5)', letterSpacing: '-.02em', lineHeight: 1 }}>{kpis?.renewalCount ?? 0}</div>
+            <div style={{ fontSize: 12, color: 'var(--c-6b707b)', marginTop: 11 }}>{nearestRenewalText}</div>
           </div>
         </div>
       )}
 
       {/* Tools table container */}
-      <div style={{ background: '#0E1014', border: '1px solid #1A1D24', borderRadius: 16, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--c-0e1014)', border: '1px solid var(--c-1a1d24)', borderRadius: 16, overflow: 'hidden' }}>
 
         {/* Filter tabs */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '12px 16px 0', borderBottom: '1px solid #1A1D24' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '12px 16px 0', borderBottom: '1px solid var(--c-1a1d24)' }}>
           {TABS.map(({ key, label }) => {
             const count = key === 'All' ? tools.length
               : key === 'NOBUDGET' ? tools.filter((t) => t.paymentKind === 'NOBUDGET').length
@@ -293,37 +293,38 @@ export default function DashboardPage() {
                   : tools.filter((t) => ['MOSUB', 'CAPSUB'].includes(t.paymentKind)).length;
             const active = filter === key;
             return (
-              <button key={key} onClick={() => setFilter(key)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: '8px 8px 0 0', border: 'none', background: active ? '#0E1014' : 'transparent', color: active ? '#E6E8EC' : '#6b707b', fontSize: 12.5, fontWeight: active ? 600 : 500, cursor: 'pointer', borderBottom: active ? '1px solid #0E1014' : 'none', marginBottom: active ? -1 : 0 }}>
+              <button key={key} onClick={() => setFilter(key)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: '8px 8px 0 0', border: 'none', background: active ? 'var(--c-0e1014)' : 'transparent', color: active ? 'var(--c-e6e8ec)' : 'var(--c-6b707b)', fontSize: 12.5, fontWeight: active ? 600 : 500, cursor: 'pointer', borderBottom: active ? '1px solid var(--c-0e1014)' : 'none', marginBottom: active ? -1 : 0 }}>
                 {label}
-                <span style={{ fontSize: 10.5, fontWeight: 650, color: active ? '#9aa2ef' : '#4a4f59', opacity: active ? 1 : 0.7 }}>{count}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 650, color: active ? 'var(--c-9aa2ef)' : 'var(--c-4a4f59)', opacity: active ? 1 : 0.7 }}>{count}</span>
               </button>
             );
           })}
           <div style={{ marginLeft: 'auto', padding: '4px 16px' }}>
-            <button onClick={() => setShowAdd(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(94,106,210,.12)', border: 'none', color: '#9aa2ef', fontSize: 12, fontWeight: 550, cursor: 'pointer' }}>
+            <button onClick={() => setShowAdd(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(94,106,210,.12)', border: 'none', color: 'var(--c-9aa2ef)', fontSize: 12, fontWeight: 550, cursor: 'pointer' }}>
               <Plus size={12} /> Add Tool
             </button>
           </div>
         </div>
 
         {/* Header row */}
-        <div style={{ display: 'grid', gridTemplateColumns: GRID, alignItems: 'center', padding: '11px 22px', borderBottom: '1px solid #1A1D24', background: '#0C0E12' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: GRID, alignItems: 'center', padding: '11px 22px', borderBottom: '1px solid var(--c-1a1d24)', background: 'var(--c-0c0e12)' }}>
           {HEADERS.map((h) => (
-            <div key={h} style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: '#5e636e' }}>{h}</div>
+            <div key={h} style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--c-5e636e)' }}>{h}</div>
           ))}
         </div>
 
         {/* Tool rows */}
         {displayed.map((tool) => {
           const fmtAmt = makeFmt(currency, fxRate);
-          const { statusMain, statusSubColor, barColor, renewMain, renewSub, renewColor, renewUrgent, payBg, payColor, payLabel } = computeRow(tool, fmtAmt);
           const periodAmount = periodSpendByTool[tool.id] ?? 0;
+          const budgetPeriod = spendPeriod === 'this_month' ? undefined : { months: monthsInPeriod(spendPeriod), amount: periodAmount };
+          const { statusMain, statusSub, barPct, budgetAlert, statusSubColor, barColor, renewMain, renewSub, renewColor, renewUrgent, payBg, payColor, payLabel } = computeRow(tool, fmtAmt, budgetPeriod);
           const remainingBalance = tool.integration?.lastSyncRemainingBalanceUSD;
           return (
             <ToolRow
               key={tool.id}
               tool={tool}
-              statusMain={statusMain} statusSubColor={statusSubColor} barColor={barColor}
+              statusMain={statusMain} statusSub={statusSub} barPct={barPct} budgetAlert={budgetAlert} statusSubColor={statusSubColor} barColor={barColor}
               periodSpendDisplay={fmtAmt(periodAmount)}
               remainingBalanceDisplay={remainingBalance != null ? fmtAmt(remainingBalance) : null}
               renewMain={renewMain} renewSub={renewSub} renewColor={renewColor} renewUrgent={renewUrgent}
@@ -340,11 +341,11 @@ export default function DashboardPage() {
         })}
 
         {displayed.length === 0 && (
-          <div style={{ padding: '48px 22px', textAlign: 'center', fontSize: 13, color: '#4a4f59' }}>
-            No tools found. Click <span style={{ color: '#9aa2ef' }}>Add Tool</span> to get started.
+          <div style={{ padding: '48px 22px', textAlign: 'center', fontSize: 13, color: 'var(--c-4a4f59)' }}>
+            No tools found. Click <span style={{ color: 'var(--c-9aa2ef)' }}>Add Tool</span> to get started.
           </div>
         )}
-        <div style={{ textAlign: 'center', fontSize: 11.5, color: '#4a4f59', padding: '10px 22px 14px' }}>
+        <div style={{ textAlign: 'center', fontSize: 11.5, color: 'var(--c-4a4f59)', padding: '10px 22px 14px' }}>
           Click a tool row to edit · use ⋮ menu to connect an integration
         </div>
       </div>
@@ -361,7 +362,7 @@ export default function DashboardPage() {
         return (
           <>
             <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpenMenu(null)} />
-            <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, background: '#1B1E26', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '4px 0', zIndex: 50, minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+            <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, background: 'var(--c-1b1e26)', border: '1px solid rgba(var(--fg-rgb),0.1)', borderRadius: 10, padding: '4px 0', zIndex: 50, minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
               <DropBtn label="Edit" icon={<PencilIcon />} onClick={() => { setEditTool(menuTool); setOpenMenu(null); }} />
               {!hideConnect && (
                 <DropBtn
@@ -370,7 +371,7 @@ export default function DashboardPage() {
                   onClick={() => { setIntegrationTool(menuTool); setOpenMenu(null); }}
                 />
               )}
-              <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '3px 0' }} />
+              <div style={{ height: 1, background: 'rgba(var(--fg-rgb),0.06)', margin: '3px 0' }} />
               <DropBtn label="Delete" icon={<TrashIcon />} danger onClick={() => { setConfirmDelete(menuTool); setOpenMenu(null); }} />
             </div>
           </>
@@ -379,7 +380,7 @@ export default function DashboardPage() {
 
       {/* Toast */}
       {toast && (
-        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', padding: '8px 16px', borderRadius: 10, background: '#1B1E26', border: '1px solid rgba(255,255,255,0.1)', color: '#F0F0F0', fontSize: 13, fontWeight: 500, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 60 }}>
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', padding: '8px 16px', borderRadius: 10, background: 'var(--c-1b1e26)', border: '1px solid rgba(var(--fg-rgb),0.1)', color: 'var(--c-f0f0f0)', fontSize: 13, fontWeight: 500, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 60 }}>
           {toast}
         </div>
       )}
@@ -417,22 +418,22 @@ export default function DashboardPage() {
       )}
       {confirmDelete && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(0,0,0,0.6)' }}>
-          <div style={{ width: '100%', maxWidth: 360, borderRadius: 18, padding: 24, background: '#0F1116', border: '1px solid #1E212A', boxShadow: '0 24px 64px rgba(0,0,0,.5)' }}>
+          <div style={{ width: '100%', maxWidth: 360, borderRadius: 18, padding: 24, background: 'var(--c-0f1116)', border: '1px solid var(--c-1e212a)', boxShadow: '0 24px 64px rgba(0,0,0,.5)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(248,81,73,.12)' }}>
-                <TrashIcon color="#F85149" />
+                <TrashIcon color="var(--c-f85149)" />
               </div>
               <div>
-                <p style={{ fontSize: 14, fontWeight: 650, color: '#F2F3F5', margin: 0 }}>Delete tool</p>
-                <p style={{ fontSize: 12, color: '#878c96', margin: '2px 0 0' }}>This action cannot be undone</p>
+                <p style={{ fontSize: 14, fontWeight: 650, color: 'var(--c-f2f3f5)', margin: 0 }}>Delete tool</p>
+                <p style={{ fontSize: 12, color: 'var(--c-878c96)', margin: '2px 0 0' }}>This action cannot be undone</p>
               </div>
             </div>
-            <p style={{ fontSize: 13, color: '#878c96', marginBottom: 20 }}>
-              Are you sure you want to delete <span style={{ color: '#F2F3F5', fontWeight: 600 }}>{confirmDelete.name}</span>? Billing history will be preserved.
+            <p style={{ fontSize: 13, color: 'var(--c-878c96)', marginBottom: 20 }}>
+              Are you sure you want to delete <span style={{ color: 'var(--c-f2f3f5)', fontWeight: 600 }}>{confirmDelete.name}</span>? Billing history will be preserved.
             </p>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: '10px 0', borderRadius: 9, background: '#1B1E26', border: '1px solid #2a2e38', color: '#9aa0ab', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={() => deleteTool(confirmDelete.id, confirmDelete.name)} style={{ flex: 1, padding: '10px 0', borderRadius: 9, background: '#F85149', border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+              <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: '10px 0', borderRadius: 9, background: 'var(--c-1b1e26)', border: '1px solid var(--c-2a2e38)', color: 'var(--c-9aa0ab)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => deleteTool(confirmDelete.id, confirmDelete.name)} style={{ flex: 1, padding: '10px 0', borderRadius: 9, background: 'var(--c-f85149)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
             </div>
           </div>
         </div>
@@ -459,7 +460,7 @@ function fmtSyncAgo(iso: string): string {
   return `synced ${diffHr}h ago`;
 }
 
-function ToolRow({ tool, statusMain, statusSubColor, barColor, periodSpendDisplay, remainingBalanceDisplay, renewMain, renewSub, renewColor, renewUrgent, payBg, payColor, payLabel, onEdit, onIntegration, onMenu }: any) {
+function ToolRow({ tool, statusMain, statusSub, barPct, budgetAlert, statusSubColor, barColor, periodSpendDisplay, remainingBalanceDisplay, renewMain, renewSub, renewColor, renewUrgent, payBg, payColor, payLabel, onEdit, onIntegration, onMenu }: any) {
   const [hover, setHover] = useState(false);
   const hasIntegration = !!tool.integration;
   const syncError = tool.integration?.lastError;
@@ -472,24 +473,24 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, periodSpendDispla
   // Wallet-style providers (e.g. HeyGen) drain toward zero rather than climb toward a
   // cap - a low balance is the meaningful warning signal here, not barPct. Fixed
   // thresholds, not a configurable field (see docs/heygen-remaining-balance-loop-prompt.md).
-  const balanceColor = remainingBalance == null ? '#4a4f59' : remainingBalance < 1 ? '#F85149' : remainingBalance < 5 ? '#F5A623' : '#4a4f59';
+  const balanceColor = remainingBalance == null ? 'var(--c-4a4f59)' : remainingBalance < 1 ? 'var(--c-f85149)' : remainingBalance < 5 ? 'var(--c-f5a623)' : 'var(--c-4a4f59)';
   return (
     <div
-      style={{ display: 'grid', gridTemplateColumns: GRID, alignItems: 'center', padding: '13px 22px', borderBottom: '1px solid #15181E', background: tool.alert ? (hover ? '#1a1018' : 'rgba(248,81,73,.03)') : (hover ? '#121419' : 'transparent'), boxShadow: `inset 3px 0 0 ${tool.alert ? '#F85149' : 'transparent'}`, transition: 'background .12s', cursor: 'pointer' }}
+      style={{ display: 'grid', gridTemplateColumns: GRID, alignItems: 'center', padding: '13px 22px', borderBottom: '1px solid var(--c-15181e)', background: tool.alert ? (hover ? 'var(--c-1a1018)' : 'rgba(248,81,73,.03)') : (hover ? 'var(--c-121419)' : 'transparent'), boxShadow: `inset 3px 0 0 ${tool.alert ? 'var(--c-f85149)' : 'transparent'}`, transition: 'background .12s', cursor: 'pointer' }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       onClick={onEdit}
     >
       {/* Tool */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, paddingRight: 10 }}>
-        <div style={{ width: 32, height: 32, borderRadius: 9, background: tool.monoBgColor, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0, border: '1px solid rgba(255,255,255,.08)' }}>{tool.monoInitials}</div>
+        <div style={{ width: 32, height: 32, borderRadius: 9, background: tool.monoBgColor, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0, border: '1px solid rgba(var(--fg-rgb),.08)' }}>{tool.monoInitials}</div>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ fontSize: 13.5, fontWeight: 580, color: '#E6E8EC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tool.name}</span>
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#34394a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.5 }}><path d="M6 3.5L10.5 8L6 12.5" /></svg>
-            {tool.alert && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F85149', flexShrink: 0, boxShadow: '0 0 0 3px rgba(248,81,73,.15)', display: 'inline-block' }} />}
+            <span style={{ fontSize: 13.5, fontWeight: 580, color: 'var(--c-e6e8ec)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tool.name}</span>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--c-34394a)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.5 }}><path d="M6 3.5L10.5 8L6 12.5" /></svg>
+            {tool.alert && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--c-f85149)', flexShrink: 0, boxShadow: '0 0 0 3px rgba(248,81,73,.15)', display: 'inline-block' }} />}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 11, color: '#6b707b' }}>{tool.vendor}</span>
+            <span style={{ fontSize: 11, color: 'var(--c-6b707b)' }}>{tool.vendor}</span>
             {hasIntegration ? (
               <button
                 onClick={(e: React.MouseEvent) => { e.stopPropagation(); onIntegration(); }}
@@ -502,7 +503,7 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, periodSpendDispla
                   display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 20,
                   background: syncError ? 'rgba(248,81,73,.12)' : hasLag ? 'rgba(245,166,35,.1)' : 'rgba(63,185,80,.1)',
                   border: `1px solid ${syncError ? 'rgba(248,81,73,.3)' : hasLag ? 'rgba(245,166,35,.28)' : 'rgba(63,185,80,.25)'}`,
-                  color: syncError ? '#F85149' : hasLag ? '#d99e3e' : '#3FB950',
+                  color: syncError ? 'var(--c-f85149)' : hasLag ? 'var(--c-d99e3e)' : 'var(--c-3fb950)',
                   fontSize: 9.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '.03em',
                 }}
               >
@@ -516,7 +517,7 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, periodSpendDispla
               // never stops meaning "actually syncing via an integration."
               <span
                 title="Marked as an actively used tool"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 20, background: 'rgba(94,106,210,.14)', border: '1px solid rgba(94,106,210,.32)', color: '#9aa2ef', fontSize: 9.5, fontWeight: 600, letterSpacing: '.03em' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 20, background: 'rgba(94,106,210,.14)', border: '1px solid rgba(94,106,210,.32)', color: 'var(--c-9aa2ef)', fontSize: 9.5, fontWeight: 600, letterSpacing: '.03em' }}
               >
                 <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'currentColor', flexShrink: 0, display: 'inline-block' }} />
                 Active
@@ -527,7 +528,7 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, periodSpendDispla
       </div>
 
       {/* Category */}
-      <div><span style={{ fontSize: 12, color: '#9aa0ab', fontWeight: 450 }}>{CAT_LABELS[tool.category] || tool.category}</span></div>
+      <div><span style={{ fontSize: 12, color: 'var(--c-9aa0ab)', fontWeight: 450 }}>{CAT_LABELS[tool.category] || tool.category}</span></div>
 
       {/* Payment */}
       <div><span style={{ display: 'inline-flex', fontSize: 11, fontWeight: 550, padding: '3px 9px', borderRadius: 20, background: payBg, color: payColor }}>{payLabel}</span></div>
@@ -535,19 +536,19 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, periodSpendDispla
       {/* Budget Status */}
       <div style={{ paddingRight: 18 }}>
         {tool.paymentKind === 'NOBUDGET' ? (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 550, padding: '4px 11px', borderRadius: 20, background: 'rgba(245,166,35,.1)', color: '#d99e3e', border: '1px solid rgba(245,166,35,.28)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 550, padding: '4px 11px', borderRadius: 20, background: 'rgba(245,166,35,.1)', color: 'var(--c-d99e3e)', border: '1px solid rgba(245,166,35,.28)' }}>
             <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M8 2.5L14.5 13H1.5L8 2.5Z" strokeLinejoin="round" /><line x1="8" y1="6.5" x2="8" y2="9" /></svg>
             No Budget Set
           </span>
         ) : tool.paymentKind === 'MOSUB' ? (
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#cfd3da', letterSpacing: '-.01em' }}>{statusMain}</div>
-            <div style={{ fontSize: 10.5, color: '#6b707b', marginTop: 2 }}>flat rate · no cap</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--c-cfd3da)', letterSpacing: '-.01em' }}>{statusMain}</div>
+            <div style={{ fontSize: 10.5, color: 'var(--c-6b707b)', marginTop: 2 }}>flat rate · no cap</div>
           </div>
         ) : tool.paymentKind === 'ONETIME' ? (
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#cfd3da', letterSpacing: '-.01em' }}>{statusMain}</div>
-            <div style={{ fontSize: 10.5, color: '#6b707b', marginTop: 2 }}>already paid · not recurring</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--c-cfd3da)', letterSpacing: '-.01em' }}>{statusMain}</div>
+            <div style={{ fontSize: 10.5, color: 'var(--c-6b707b)', marginTop: 2 }}>already paid · not recurring</div>
           </div>
         ) : remainingBalanceDisplay ? (
           // Wallet-style integration (e.g. HeyGen) - the meaningful number is a
@@ -555,32 +556,32 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, periodSpendDispla
           // cap, so the usedAmount/capAmount bar doesn't apply here at all - show
           // only the balance, as the primary figure rather than a secondary line.
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 650, color: balanceColor === '#4a4f59' ? '#cfd3da' : balanceColor, letterSpacing: '-.01em' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 650, color: balanceColor === 'var(--c-4a4f59)' ? 'var(--c-cfd3da)' : balanceColor, letterSpacing: '-.01em' }}>
               {remainingBalance != null && remainingBalance < 5 && (
                 <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8 2.5L14.5 13H1.5L8 2.5Z" strokeLinejoin="round" /><line x1="8" y1="6.5" x2="8" y2="9" /></svg>
               )}
               {remainingBalanceDisplay} left
             </div>
             {hasIntegration && tool.integration?.lastSyncAt && (
-              <div style={{ fontSize: 10, color: '#4a4f59', marginTop: 4 }}>{fmtSyncAgo(tool.integration.lastSyncAt)}</div>
+              <div style={{ fontSize: 10, color: 'var(--c-4a4f59)', marginTop: 4 }}>{fmtSyncAgo(tool.integration.lastSyncAt)}</div>
             )}
           </div>
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-              <span style={{ fontSize: 12, fontWeight: 560, color: '#cfd3da' }}>{statusMain}</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: statusSubColor }}>{tool.statusSub}</span>
+              <span style={{ fontSize: 12, fontWeight: 560, color: 'var(--c-cfd3da)' }}>{statusMain}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: statusSubColor }}>{statusSub}</span>
             </div>
-            <div style={{ height: 6, borderRadius: 999, background: '#1B1E26', overflow: 'hidden' }}>
-              <div style={{ height: '100%', borderRadius: 999, width: `${Math.min(100, tool.barPct)}%`, background: barColor }} />
+            <div style={{ height: 6, borderRadius: 999, background: 'var(--c-1b1e26)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: 999, width: `${Math.min(100, barPct)}%`, background: barColor }} />
             </div>
             {hasIntegration && tool.integration?.lastSyncAt && (
-              <div style={{ fontSize: 10, color: '#4a4f59', marginTop: 4 }}>{fmtSyncAgo(tool.integration.lastSyncAt)}</div>
+              <div style={{ fontSize: 10, color: 'var(--c-4a4f59)', marginTop: 4 }}>{fmtSyncAgo(tool.integration.lastSyncAt)}</div>
             )}
-            {tool.alert && (
+            {budgetAlert && (
               <div style={{ marginTop: 5, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 20, background: 'rgba(248,81,73,.1)', border: '1px solid rgba(248,81,73,.28)' }}>
-                <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="#F85149" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.5L14.5 13H1.5L8 2.5Z" strokeLinejoin="round" /><line x1="8" y1="6.5" x2="8" y2="9" /></svg>
-                <span style={{ fontSize: 10, fontWeight: 650, color: '#F85149', letterSpacing: '.02em' }}>Alert: {tool.barPct}% used · threshold {tool.alertThresholdPct}%</span>
+                <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="var(--c-f85149)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.5L14.5 13H1.5L8 2.5Z" strokeLinejoin="round" /><line x1="8" y1="6.5" x2="8" y2="9" /></svg>
+                <span style={{ fontSize: 10, fontWeight: 650, color: 'var(--c-f85149)', letterSpacing: '.02em' }}>Alert: {barPct}% used · threshold {tool.alertThresholdPct}%</span>
               </div>
             )}
           </>
@@ -592,9 +593,9 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, periodSpendDispla
           NOBUDGET tools (they're excluded from that total by design). */}
       <div style={{ paddingRight: 14 }}>
         {tool.paymentKind === 'NOBUDGET' ? (
-          <span style={{ fontSize: 12.5, color: '#4a4f59' }}>-</span>
+          <span style={{ fontSize: 12.5, color: 'var(--c-4a4f59)' }}>-</span>
         ) : (
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#cfd3da', fontVariantNumeric: 'tabular-nums' }}>{periodSpendDisplay}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--c-cfd3da)', fontVariantNumeric: 'tabular-nums' }}>{periodSpendDisplay}</span>
         )}
       </div>
 
@@ -606,15 +607,15 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, periodSpendDispla
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="1.8" y="3.5" width="12.4" height="9" rx="2" /><path d="M2.4 4.5L8 8.3l5.6-3.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </span>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 12, color: '#c2c6cf', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tool.triggerEmail}</div>
-              <div style={{ fontSize: 10.5, color: '#6b707b' }}>
+              <div style={{ fontSize: 12, color: 'var(--c-c2c6cf)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tool.triggerEmail}</div>
+              <div style={{ fontSize: 10.5, color: 'var(--c-6b707b)' }}>
                 {tool.paymentKind === 'MOSUB' ? 'renewal reminder' : `at ${tool.alertThresholdPct}% usage`}
               </div>
             </div>
           </div>
         ) : (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#5e636e' }}>
-            <span style={{ width: 14, height: 1.5, background: '#34394a', display: 'inline-block' }} />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--c-5e636e)' }}>
+            <span style={{ width: 14, height: 1.5, background: 'var(--c-34394a)', display: 'inline-block' }} />
             Not configured
           </span>
         )}
@@ -626,9 +627,9 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, periodSpendDispla
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '5px 10px', borderRadius: 20,
-            background: renewColor === '#F85149' ? 'rgba(248,81,73,0.12)' : 'rgba(245,166,35,0.12)',
-            border: `1px solid ${renewColor === '#F85149' ? 'rgba(248,81,73,0.4)' : 'rgba(245,166,35,0.4)'}`,
-            animation: renewColor === '#F85149' ? 'pulseRing 2.4s ease-in-out infinite' : 'pulseAmber 2.4s ease-in-out infinite',
+            background: renewColor === 'var(--c-f85149)' ? 'rgba(248,81,73,0.12)' : 'rgba(245,166,35,0.12)',
+            border: `1px solid ${renewColor === 'var(--c-f85149)' ? 'rgba(248,81,73,0.4)' : 'rgba(245,166,35,0.4)'}`,
+            animation: renewColor === 'var(--c-f85149)' ? 'pulseRing 2.4s ease-in-out infinite' : 'pulseAmber 2.4s ease-in-out infinite',
           }}>
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke={renewColor} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
               <circle cx="8" cy="8" r="6" /><path d="M8 5v3.5l2 2" />
@@ -641,7 +642,7 @@ function ToolRow({ tool, statusMain, statusSubColor, barColor, periodSpendDispla
         ) : (
           <>
             <div style={{ fontSize: 12.5, fontWeight: 550, color: renewColor }}>{renewMain}</div>
-            {renewSub && <div style={{ fontSize: 11, color: '#6b707b' }}>{renewSub}</div>}
+            {renewSub && <div style={{ fontSize: 11, color: 'var(--c-6b707b)' }}>{renewSub}</div>}
           </>
         )}
       </div>
@@ -660,7 +661,7 @@ function ThreeDotBtn({ onMenu }: { onMenu: (e: React.MouseEvent) => void }) {
     <button
       onClick={(e) => { e.stopPropagation(); onMenu(e); }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ width: 32, height: 32, borderRadius: 8, background: hover ? '#16181F' : 'transparent', border: 'none', color: hover ? '#9aa0ab' : '#6b707b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      style={{ width: 32, height: 32, borderRadius: 8, background: hover ? 'var(--c-16181f)' : 'transparent', border: 'none', color: hover ? 'var(--c-9aa0ab)' : 'var(--c-6b707b)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
     >
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="4" r="1.5" fill="currentColor" /><circle cx="8" cy="8" r="1.5" fill="currentColor" /><circle cx="8" cy="12" r="1.5" fill="currentColor" /></svg>
     </button>
@@ -671,7 +672,7 @@ function DropBtn({ label, icon, danger, onClick }: { label: string; icon: ReactN
   const [hover, setHover] = useState(false);
   return (
     <button onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', fontSize: 12, background: hover ? 'rgba(255,255,255,0.04)' : 'transparent', border: 'none', cursor: 'pointer', color: danger ? '#F85149' : hover ? '#E6E8EC' : '#9aa0ab', transition: 'all .1s' }}>
+      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', fontSize: 12, background: hover ? 'rgba(var(--fg-rgb),0.04)' : 'transparent', border: 'none', cursor: 'pointer', color: danger ? 'var(--c-f85149)' : hover ? 'var(--c-e6e8ec)' : 'var(--c-9aa0ab)', transition: 'all .1s' }}>
       {icon} {label}
     </button>
   );

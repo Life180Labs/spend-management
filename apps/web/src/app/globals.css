@@ -2,17 +2,172 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Day/night theme. Every UI color that has to change between themes is a
+   --c-<original dark hex> variable: the dark value is exactly the color the
+   app always used, the light value is its day-mode counterpart. Brand/status
+   hues that read fine on both backgrounds stay as literal hex in the TSX.
+   --fg-rgb replaces the white-alpha overlays (rgba(255,255,255,x)) used for
+   borders and subtle fills, so they become dark-alpha overlays in day mode. */
 :root {
-  --bg: #0D0F14;
-  --bg-2: #13161D;
-  --bg-3: #1B1E26;
-  --border: rgba(255, 255, 255, 0.07);
+  color-scheme: dark;
+  --fg-rgb: 255, 255, 255;
+  --c-080a0e: #080A0E;
+  --c-0a0b0e: #0A0B0E;
+  --c-0a0c10: #0A0C10;
+  --c-0c0e12: #0C0E12;
+  --c-0d0f14: #0D0F14;
+  --c-0d130e: #0D130E;
+  --c-0e1014: #0E1014;
+  --c-0f1116: #0F1116;
+  --c-101218: #101218;
+  --c-111318: #111318;
+  --c-121419: #121419;
+  --c-13161d: #13161D;
+  --c-14161d: #14161D;
+  --c-15181e: #15181E;
+  --c-16181f: #16181F;
+  --c-16191f: #16191F;
+  --c-161921: #161921;
+  --c-171a22: #171A22;
+  --c-1a1018: #1A1018;
+  --c-1a1d24: #1A1D24;
+  --c-1a1d26: #1A1D26;
+  --c-1b1e26: #1B1E26;
+  --c-1e212a: #1E212A;
+  --c-1f2330: #1F2330;
+  --c-232730: #232730;
+  --c-2a2d36: #2A2D36;
+  --c-2a2e38: #2A2E38;
+  --c-2a2e3d: #2A2E3D;
+  --c-333740: #333740;
+  --c-34394a: #34394A;
+  --c-3a3f4a: #3A3F4A;
+  --c-3d4250: #3D4250;
+  --c-3d4555: #3D4555;
+  --c-3fb950: #3FB950;
+  --c-44495a: #44495A;
+  --c-4a4f59: #4A4F59;
+  --c-4a5060: #4A5060;
+  --c-4a5169: #4A5169;
+  --c-4a7a4a: #4A7A4A;
+  --c-4fc9cb: #4FC9CB;
+  --c-555b6b: #555B6B;
+  --c-5b6280: #5B6280;
+  --c-5d9a5d: #5D9A5D;
+  --c-5e636e: #5E636E;
+  --c-5e6480: #5E6480;
+  --c-5fba6f: #5FBA6F;
+  --c-6b707b: #6B707B;
+  --c-6b7280: #6B7280;
+  --c-767b86: #767B86;
+  --c-7a8090: #7A8090;
+  --c-878c96: #878C96;
+  --c-8a7d5e: #8A7D5E;
+  --c-8a909b: #8A909B;
+  --c-8fcf8f: #8FCF8F;
+  --c-9aa0ab: #9AA0AB;
+  --c-9aa2ef: #9AA2EF;
+  --c-a8c890: #A8C890;
+  --c-b06060: #B06060;
+  --c-c2c6cf: #C2C6CF;
+  --c-c98a86: #C98A86;
+  --c-cfd3da: #CFD3DA;
+  --c-d6a44e: #D6A44E;
+  --c-d99e3e: #D99E3E;
+  --c-e6e8ec: #E6E8EC;
+  --c-e8eaf0: #E8EAF0;
+  --c-f0f0f0: #F0F0F0;
+  --c-f2f3f5: #F2F3F5;
+  --c-f5a623: #F5A623;
+  --c-f85149: #F85149;
+  --c-f87171: #F87171;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --fg-rgb: 15, 23, 42;
+  --c-080a0e: #F1F3F6;
+  --c-0a0b0e: #F3F4F7;
+  --c-0a0c10: #F7F8FA;
+  --c-0c0e12: #FEFEFE;
+  --c-0d0f14: #FFFFFF;
+  --c-0d130e: #FFFFFF;
+  --c-0e1014: #FFFFFF;
+  --c-0f1116: #FFFFFF;
+  --c-101218: #FEFEFE;
+  --c-111318: #FDFDFD;
+  --c-121419: #FBFCFC;
+  --c-13161d: #F8F8FA;
+  --c-14161d: #F7F8FA;
+  --c-15181e: #F6F7F9;
+  --c-16181f: #F5F6F8;
+  --c-16191f: #F5F6F8;
+  --c-161921: #F3F4F7;
+  --c-171a22: #F2F3F6;
+  --c-1a1018: #FDFCFD;
+  --c-1a1d24: #EEEFF3;
+  --c-1a1d26: #ECEDF2;
+  --c-1b1e26: #EBEDF1;
+  --c-1e212a: #E7E9EE;
+  --c-1f2330: #E2E4EC;
+  --c-232730: #E1E3E9;
+  --c-2a2d36: #DADCE2;
+  --c-2a2e38: #D8DBE2;
+  --c-2a2e3d: #D4D7E1;
+  --c-333740: #CFD2D8;
+  --c-34394a: #C4C8D6;
+  --c-3a3f4a: #C1C5CE;
+  --c-3d4250: #B6BAC7;
+  --c-3d4555: #AEB6C5;
+  --c-3fb950: #1A7F37;
+  --c-44495a: #A2A7B9;
+  --c-4a4f59: #A1A6B0;
+  --c-4a5060: #959CAE;
+  --c-4a5169: #878FAA;
+  --c-4a7a4a: #6FA76F;
+  --c-4fc9cb: #33ABAD;
+  --c-555b6b: #81889B;
+  --c-5b6280: #687092;
+  --c-5d9a5d: #558C55;
+  --c-5e636e: #7B818E;
+  --c-5e6480: #696F8F;
+  --c-5fba6f: #4C7F55;
+  --c-6b707b: #6F7480;
+  --c-6b7280: #6B7280;
+  --c-767b86: #686C76;
+  --c-7a8090: #616674;
+  --c-878c96: #5E626B;
+  --c-8a7d5e: #8D8060;
+  --c-8a909b: #5A5F69;
+  --c-8fcf8f: #3B623B;
+  --c-9aa0ab: #4F545E;
+  --c-9aa2ef: #2D3AB4;
+  --c-a8c890: #4E653C;
+  --c-b06060: #834E4E;
+  --c-c2c6cf: #343842;
+  --c-c98a86: #68413F;
+  --c-cfd3da: #2B3038;
+  --c-d6a44e: #B4822D;
+  --c-d99e3e: #B4802D;
+  --c-e6e8ec: #1E2127;
+  --c-e8eaf0: #191D27;
+  --c-f0f0f0: #1D1D1D;
+  --c-f2f3f5: #17191E;
+  --c-f5a623: #B26B00;
+  --c-f85149: #D1242F;
+  --c-f87171: #B42D2D;
+}
+:root {
+  --bg: var(--c-0d0f14);
+  --bg-2: var(--c-13161d);
+  --bg-3: var(--c-1b1e26);
+  --border: rgba(var(--fg-rgb), 0.07);
   --accent: #5E6AD2;
-  --success: #3FB950;
-  --warning: #F5A623;
-  --danger: #F85149;
-  --text: #F0F0F0;
-  --muted: #9aa0ab;
+  --success: var(--c-3fb950);
+  --warning: var(--c-f5a623);
+  --danger: var(--c-f85149);
+  --text: var(--c-f0f0f0);
+  --muted: var(--c-9aa0ab);
 }
 
 * {
@@ -32,7 +187,7 @@ body {
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: rgba(var(--fg-rgb),0.12); border-radius: 2px; }
 
 input, select, textarea {
   background: var(--bg-3);

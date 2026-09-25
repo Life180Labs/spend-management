@@ -76,7 +76,7 @@ export class ReportsService {
           monthKey,
           monthLabel,
           amount,
-          status: 'PENDING',
+          status: 'PAID',
           tool: {
             name: t.name,
             monoInitials: t.monoInitials,
@@ -200,6 +200,47 @@ export class ReportsService {
           category: (r.toolSnapshotJson as any)?.category || 'OTHER', billingCycle: 'MONTHLY', renewalDate: null,
         },
     }));
+
+    // Same gap as periodSpendByTool's closedMonthTotalByTool (see reports.service
+    // there): a MOSUB tool's fee is flat/the same every month by definition, but
+    // the roll-forward cron only logs a closed month once that tool's renewal
+    // cycle has actually rolled past it - so a past month it clearly existed for
+    // can still have no billing_records row. Left alone, that month is just
+    // missing here entirely (Reports' "Last Month"/quarter/YTD filters and the
+    // Excel export undercount it), instead of showing its flat rate. Backfill
+    // one synthetic row per MOSUB tool for each month from its creation up to
+    // last month that has no real record yet. Marked PAID, not PENDING: a MOSUB
+    // subscription auto-renews, so a month that has already closed was charged
+    // (monthly) or covered by the yearly payment (pro-rated) - nobody has to act
+    // on it, and "Pending" made last month's subscriptions look unpaid.
+    const haveRecord = new Set(historical.map((r) => `${r.toolId}:${r.monthKey}`));
+    const mosubTools = await this.prisma.tool.findMany({
+      where: { orgId, deletedAt: null, paymentKind: 'MOSUB' },
+      select: {
+        id: true, name: true, category: true, monoInitials: true, monoBgColor: true,
+        paymentKind: true, billingCycle: true, monthlyAmount: true, usedAmount: true, renewalDate: true, createdAt: true,
+      },
+    });
+    for (const t of mosubTools) {
+      const amount = monthlyEquivalentSpend(t);
+      if (amount <= 0) continue;
+      const createdMonth = t.createdAt.toISOString().slice(0, 7);
+      for (let m = shiftMonthKey(currentMonth, -1); m >= createdMonth; m = shiftMonthKey(m, -1)) {
+        if (haveRecord.has(`${t.id}:${m}`)) continue;
+        historical.push({
+          id: `mosub-backfill-${t.id}-${m}`,
+          toolId: t.id,
+          monthKey: m,
+          monthLabel: formatMonthLabel(m),
+          amount,
+          status: 'PAID',
+          tool: {
+            name: t.name, monoInitials: t.monoInitials, monoBgColor: t.monoBgColor, category: t.category,
+            billingCycle: t.billingCycle, renewalDate: t.renewalDate,
+          },
+        });
+      }
+    }
 
     let all = [...live, ...historical];
     if (filters.monthKey) all = all.filter((r) => r.monthKey === filters.monthKey);

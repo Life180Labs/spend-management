@@ -200,24 +200,24 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
 
   const loading = integration === undefined;
   const isConnected = !!integration;
-  const S: React.CSSProperties = { background: '#1B1E26', border: '1px solid rgba(255,255,255,0.08)', color: '#F0F0F0', outline: 'none' };
+  const S: React.CSSProperties = { background: 'var(--c-1b1e26)', border: '1px solid rgba(var(--fg-rgb),0.08)', color: 'var(--c-f0f0f0)', outline: 'none' };
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(0,0,0,0.65)' }}>
-      <div style={{ width: '100%', maxWidth: 440, borderRadius: 20, padding: 24, background: '#13161D', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 24px 64px rgba(0,0,0,.6)' }}>
+      <div style={{ width: '100%', maxWidth: 440, borderRadius: 20, padding: 24, background: 'var(--c-13161d)', border: '1px solid rgba(var(--fg-rgb),0.08)', boxShadow: '0 24px 64px rgba(0,0,0,.6)' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(94,106,210,.14)', color: '#9aa2ef' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(94,106,210,.14)', color: 'var(--c-9aa2ef)' }}>
               <PlugIcon />
             </div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 650, color: '#F0F0F0' }}>Configure Integration</div>
-              <div style={{ fontSize: 11.5, color: '#6b707b' }}>{toolName}</div>
+              <div style={{ fontSize: 14, fontWeight: 650, color: 'var(--c-f0f0f0)' }}>Configure Integration</div>
+              <div style={{ fontSize: 11.5, color: 'var(--c-6b707b)' }}>{toolName}</div>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6b707b', cursor: 'pointer', padding: 4 }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--c-6b707b)', cursor: 'pointer', padding: 4 }}>
             <X size={16} />
           </button>
         </div>
@@ -233,23 +233,23 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
               <div style={{ borderRadius: 12, padding: '12px 14px', background: 'rgba(63,185,80,.07)', border: '1px solid rgba(63,185,80,.22)', marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                    <CheckCircle2 size={13} color="#3FB950" />
-                    <span style={{ fontSize: 12.5, fontWeight: 600, color: '#3FB950' }}>
+                    <CheckCircle2 size={13} color="var(--c-3fb950)" />
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--c-3fb950)' }}>
                       Connected · {PROVIDERS.find((p) => p.value === integration.provider)?.label}
                     </span>
                   </div>
                   {integration.lastSyncAt && (
-                    <span style={{ fontSize: 11, color: '#4a7a4a' }}>Synced {fmtSyncTime(integration.lastSyncAt)}</span>
+                    <span style={{ fontSize: 11, color: 'var(--c-4a7a4a)' }}>Synced {fmtSyncTime(integration.lastSyncAt)}</span>
                   )}
                 </div>
                 {integration.lastSyncAmountUSD != null && (
-                  <div style={{ marginTop: 5, fontSize: 12, color: '#5d9a5d' }}>
-                    Last fetched: <span style={{ fontWeight: 650, color: '#8fcf8f' }}>${Number(integration.lastSyncAmountUSD).toLocaleString('en-US')}</span>
+                  <div style={{ marginTop: 5, fontSize: 12, color: 'var(--c-5d9a5d)' }}>
+                    Last fetched: <span style={{ fontWeight: 650, color: 'var(--c-8fcf8f)' }}>${Number(integration.lastSyncAmountUSD).toLocaleString('en-US')}</span>
                   </div>
                 )}
                 {integration.lastError && (
                   <div
-                    style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 11.5, color: '#F85149' }}
+                    style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 11.5, color: 'var(--c-f85149)' }}
                     title={integration.lastError}
                   >
                     <AlertCircle size={12} style={{ marginTop: 1, flexShrink: 0 }} />
@@ -258,11 +258,11 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
                 )}
               </div>
             ) : noApiAvailable ? (
-              <div style={{ borderRadius: 12, padding: '10px 14px', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', marginBottom: 16, fontSize: 12, color: '#6b707b' }}>
+              <div style={{ borderRadius: 12, padding: '10px 14px', background: 'rgba(var(--fg-rgb),.04)', border: '1px solid rgba(var(--fg-rgb),.07)', marginBottom: 16, fontSize: 12, color: 'var(--c-6b707b)' }}>
                 {vendorMatch!.label} doesn't have an API to connect to - this tool is tracked manually (Subscription payment type, entered on the tool itself).
               </div>
             ) : (
-              <div style={{ borderRadius: 12, padding: '10px 14px', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', marginBottom: 16, fontSize: 12, color: '#6b707b' }}>
+              <div style={{ borderRadius: 12, padding: '10px 14px', background: 'rgba(var(--fg-rgb),.04)', border: '1px solid rgba(var(--fg-rgb),.07)', marginBottom: 16, fontSize: 12, color: 'var(--c-6b707b)' }}>
                 Not connected. Enter your API credentials below to start syncing spend data automatically.
               </div>
             )}
@@ -271,14 +271,14 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
             {appliedLimits && (
               <div style={{ borderRadius: 12, padding: '12px 14px', background: 'rgba(94,106,210,.08)', border: '1px solid rgba(94,106,210,.28)', marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#9aa2ef" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L6 9l-3-3" /></svg>
-                  <span style={{ fontSize: 12, fontWeight: 650, color: '#9aa2ef' }}>Budget synced from {selectedProvider.label}</span>
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="var(--c-9aa2ef)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L6 9l-3-3" /></svg>
+                  <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--c-9aa2ef)' }}>Budget synced from {selectedProvider.label}</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px' }}>
                   <LimitRow label="Budget cap" usd={appliedLimits.computeHardLimitUSD} />
                   <LimitRow label="Alert threshold" usd={appliedLimits.computeSoftLimitUSD} pct={appliedLimits.alertThresholdPct} />
                 </div>
-                <div style={{ marginTop: 8, fontSize: 10.5, color: '#5e6480' }}>
+                <div style={{ marginTop: 8, fontSize: 10.5, color: 'var(--c-5e6480)' }}>
                   Based on your {selectedProvider.label} usage limit
                 </div>
               </div>
@@ -286,7 +286,7 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
 
             {/* Form error */}
             {formError && (
-              <div style={{ borderRadius: 10, padding: '9px 13px', background: 'rgba(248,81,73,.1)', border: '1px solid rgba(248,81,73,.28)', fontSize: 12, color: '#F85149', marginBottom: 14 }}>
+              <div style={{ borderRadius: 10, padding: '9px 13px', background: 'rgba(248,81,73,.1)', border: '1px solid rgba(248,81,73,.28)', fontSize: 12, color: 'var(--c-f85149)', marginBottom: 14 }}>
                 {formError}
               </div>
             )}
@@ -295,9 +295,9 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
               <>
                 {/* Provider */}
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ display: 'block', fontSize: 11.5, color: '#9aa0ab', marginBottom: 6 }}>Provider</label>
+                  <label style={{ display: 'block', fontSize: 11.5, color: 'var(--c-9aa0ab)', marginBottom: 6 }}>Provider</label>
                   {providerLocked ? (
-                    <div style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 13, boxSizing: 'border-box', color: '#8a909b' }}>
+                    <div style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 13, boxSizing: 'border-box', color: 'var(--c-8a909b)' }}>
                       {selectedProvider.label}
                     </div>
                   ) : (
@@ -315,9 +315,9 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
                 <div style={{ marginBottom: 20 }}>
                   {isMultiField ? (
                     <>
-                      <label style={{ display: 'block', fontSize: 11.5, color: '#9aa0ab', marginBottom: 6 }}>
+                      <label style={{ display: 'block', fontSize: 11.5, color: 'var(--c-9aa0ab)', marginBottom: 6 }}>
                         GCP credentials
-                        {isConnected && <span style={{ color: '#4a4f59', marginLeft: 6 }}>(re-enter all fields to update)</span>}
+                        {isConnected && <span style={{ color: 'var(--c-4a4f59)', marginLeft: 6 }}>(re-enter all fields to update)</span>}
                       </label>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         <input type="text" value={gcpBillingAccountId} onChange={(e) => setGcpBillingAccountId(e.target.value)}
@@ -339,13 +339,13 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
                           rows={3} spellCheck={false}
                           style={{ ...S, width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 11, fontFamily: 'monospace', lineHeight: 1.5, boxSizing: 'border-box', resize: 'vertical' }} />
                       </div>
-                      <p style={{ fontSize: 11, color: '#4a4f59', marginTop: 6 }}>{selectedProvider.helpText}</p>
+                      <p style={{ fontSize: 11, color: 'var(--c-4a4f59)', marginTop: 6 }}>{selectedProvider.helpText}</p>
                     </>
                   ) : (
                     <>
-                      <label style={{ display: 'block', fontSize: 11.5, color: '#9aa0ab', marginBottom: 6 }}>
+                      <label style={{ display: 'block', fontSize: 11.5, color: 'var(--c-9aa0ab)', marginBottom: 6 }}>
                         {selectedProvider.tokenLabel}
-                        {isConnected && <span style={{ color: '#4a4f59', marginLeft: 6 }}>(re-enter to update)</span>}
+                        {isConnected && <span style={{ color: 'var(--c-4a4f59)', marginLeft: 6 }}>(re-enter to update)</span>}
                       </label>
                       <div style={{ position: 'relative' }}>
                         <input
@@ -359,12 +359,12 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
                         <button
                           type="button"
                           onClick={() => setShowToken(!showToken)}
-                          style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#5e636e', cursor: 'pointer', padding: 2 }}
+                          style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--c-5e636e)', cursor: 'pointer', padding: 2 }}
                         >
                           {showToken ? <EyeOffIcon /> : <EyeIcon />}
                         </button>
                       </div>
-                      <p style={{ fontSize: 11, color: '#4a4f59', marginTop: 6 }}>
+                      <p style={{ fontSize: 11, color: 'var(--c-4a4f59)', marginTop: 6 }}>
                         {selectedProvider.helpText}
                       </p>
                     </>
@@ -377,7 +377,7 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
                     <button
                       onClick={handleSyncNow}
                       disabled={syncing}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'rgba(94,106,210,.12)', border: '1px solid rgba(94,106,210,.22)', color: '#9aa2ef', fontSize: 12.5, fontWeight: 550, cursor: syncing ? 'not-allowed' : 'pointer', opacity: syncing ? 0.7 : 1, flexShrink: 0 }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'rgba(94,106,210,.12)', border: '1px solid rgba(94,106,210,.22)', color: 'var(--c-9aa2ef)', fontSize: 12.5, fontWeight: 550, cursor: syncing ? 'not-allowed' : 'pointer', opacity: syncing ? 0.7 : 1, flexShrink: 0 }}
                     >
                       {syncing
                         ? <Loader2 size={13} className="animate-spin" />
@@ -392,7 +392,7 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
                     <button
                       onClick={handleDisconnect}
                       disabled={removing}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'rgba(248,81,73,.08)', border: '1px solid rgba(248,81,73,.18)', color: '#F85149', fontSize: 12.5, fontWeight: 550, cursor: removing ? 'not-allowed' : 'pointer', opacity: removing ? 0.7 : 1, flexShrink: 0 }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'rgba(248,81,73,.08)', border: '1px solid rgba(248,81,73,.18)', color: 'var(--c-f85149)', fontSize: 12.5, fontWeight: 550, cursor: removing ? 'not-allowed' : 'pointer', opacity: removing ? 0.7 : 1, flexShrink: 0 }}
                     >
                       {removing ? <Loader2 size={13} className="animate-spin" /> : <UnplugIcon />}
                       Disconnect
@@ -410,7 +410,7 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
                 </div>
 
                 {isConnected && (
-                  <div style={{ marginTop: 14, fontSize: 11, color: '#3a3f4a', textAlign: 'center' }}>
+                  <div style={{ marginTop: 14, fontSize: 11, color: 'var(--c-3a3f4a)', textAlign: 'center' }}>
                     Auto-syncs every {integration.syncEveryMinutes} min · data flows directly into the spend bar
                   </div>
                 )}
@@ -426,10 +426,10 @@ export function IntegrationModal({ toolId, toolName, toolVendor, onClose, onSync
 function LimitRow({ label, usd, pct }: { label: string; usd: number; pct?: number }) {
   return (
     <div>
-      <div style={{ fontSize: 10.5, color: '#5e6480', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 12.5, fontWeight: 650, color: '#c2c6cf' }}>
+      <div style={{ fontSize: 10.5, color: 'var(--c-5e6480)', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 12.5, fontWeight: 650, color: 'var(--c-c2c6cf)' }}>
         ${usd.toLocaleString('en-US')}
-        {pct !== undefined && <span style={{ fontSize: 10.5, fontWeight: 600, color: '#9aa2ef', marginLeft: 6 }}>at {pct}%</span>}
+        {pct !== undefined && <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--c-9aa2ef)', marginLeft: 6 }}>at {pct}%</span>}
       </div>
     </div>
   );
