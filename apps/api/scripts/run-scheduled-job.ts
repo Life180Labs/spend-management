@@ -15,7 +15,7 @@
  *   syncIntegrations                  - hourly
  *   checkThresholdAlerts              - hourly
  *   checkRenewalReminders             - daily at 9:00 (server timezone)
- *   rollForwardRenewalDates           - daily at 9:10 (server timezone)
+ *   rollForwardRenewalDates           - hourly at :10
  *   recordCompletedMonthUsageBilling  - monthly, 00:20 on the 1st
  * Matching crontab expressions are in scheduler.service.ts's @Cron decorators.
  */

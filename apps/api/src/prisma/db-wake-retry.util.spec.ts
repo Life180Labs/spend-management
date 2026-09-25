@@ -38,6 +38,23 @@ describe('waitForDatabaseAwake', () => {
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
   });
 
+  it('retries when Postgres accepts the connection but is still starting up (57P03), then resolves', async () => {
+    // Regression: Railway's logs showed every cron run on a cold DB failing with
+    // this error and being treated as fatal, so rollForwardRenewalDates never ran.
+    const startingUpErr = new Error(
+      'Invalid `prisma.$queryRaw()` invocation:\n\n\nError in connector: Error querying the database: FATAL: the database system is starting up',
+    );
+    prisma.$queryRaw
+      .mockRejectedValueOnce(startingUpErr)
+      .mockResolvedValueOnce([{ '?column?': 1 }]);
+
+    const p = waitForDatabaseAwake(prisma, 'test-caller', logger);
+    await jest.runAllTimersAsync();
+    await p;
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+  });
+
   it('throws the last connection error after exhausting all retries', async () => {
     prisma.$queryRaw.mockRejectedValue(connErr);
 

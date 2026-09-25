@@ -12,6 +12,17 @@ import { PrismaService } from './prisma.service';
  * log and skip this run (see scheduler.service.ts), a user-facing request
  * might surface a friendly "try again in a moment" error instead.
  */
+// A waking Postgres doesn't only refuse connections (P1001) - for a few seconds
+// it accepts them and answers `FATAL: the database system is starting up`
+// (SQLSTATE 57P03, surfaced by Prisma as an unknown/raw-query error with no
+// P-code). That's the same "still waking" state and must be retried too -
+// treating it as fatal made every scheduled job that hit a cold DB skip its run.
+const TRANSIENT_DB_MESSAGE = /Can't reach database server|database system is (starting up|shutting down|in recovery mode)|57P03/i;
+
+export function isTransientConnectionError(err: any): boolean {
+  return err?.code === 'P1001' || TRANSIENT_DB_MESSAGE.test(err?.message ?? '');
+}
+
 export async function waitForDatabaseAwake(
   prisma: PrismaService,
   label: string,
@@ -30,8 +41,7 @@ export async function waitForDatabaseAwake(
       await prisma.$queryRaw`SELECT 1`;
       return;
     } catch (err: any) {
-      const isConnectionError = err?.code === 'P1001' || /Can't reach database server/i.test(err?.message ?? '');
-      if (!isConnectionError) {
+      if (!isTransientConnectionError(err)) {
         logger.error(`${label}: non-connection database error - ${err.message}`);
         throw err;
       }

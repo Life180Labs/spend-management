@@ -111,7 +111,7 @@ pnpm dev        # runs on http://localhost:3000
 | Integration sync | Hourly | Pulls latest usage from connected provider APIs |
 | Threshold alerts | Hourly | Sends one consolidated email per recipient if any of their tools has breached its alert % (deduplicated - won't re-send for the same tool within 24 h) |
 | Renewal reminders | Daily at 9:00 AM | Emails if a subscription renews within the next 5 days |
-| Roll forward renewal dates | Daily at 9:10 AM | Advances a subscription's renewal date past any completed cycles, auto-logging each one to Billing History |
+| Roll forward renewal dates | Hourly at :10 | Advances a subscription's renewal date past any completed cycles, auto-logging each one to Billing History |
 | Record completed-month usage billing | Monthly, 00:20 on the 1st | Closes out last month's actual spend for usage-based tools with a live integration, logging it to Billing History |
 
 All five run in-process via `@nestjs/schedule` and share a DB-wake retry (`apps/api/src/prisma/db-wake-retry.util.ts`) that probes Postgres and backs off for up to ~60s before giving up on a run - handles Postgres being asleep if it's deployed on a platform with serverless/scale-to-zero database instances (e.g. Railway). Set `DISABLE_INPROCESS_SCHEDULER=true` on any deployment where these are instead triggered externally (see `apps/api/scripts/run-scheduled-job.ts`).

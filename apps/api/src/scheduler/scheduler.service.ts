@@ -181,14 +181,17 @@ export class SchedulerService {
     }
   }
 
-  // ── Roll forward past renewal dates - daily at 9:10 AM, right after the ──
-  // reminder check above so a "renews today" (daysAway = 0) email still goes
-  // out with the correct date before this advances it to the next cycle.
+  // ── Roll forward past renewal dates - hourly at :10. Only dates strictly ──
+  // before today are advanced, so today's "renews today" (daysAway = 0)
+  // reminder still goes out with the correct date. Runs hourly rather than
+  // once a day so a single failed run (e.g. Postgres still waking from
+  // Serverless sleep) is retried within the hour instead of leaving a past
+  // renewal date on the dashboard until tomorrow - safe because it's
+  // idempotent (no past dates → no-op; recordCompletedCycle dedupes).
   // Only MOSUB/CAPSUB are recurring billing cycles - PREPAID's renewalDate is
   // a contract/license term, not a recurring one, so it's left alone here.
-  // Cadence itself (monthly vs yearly) comes from each tool's billingCycle -
-  // this is not "the monthly cron," it just happens to run once a day.
-  @Cron('10 9 * * *', { disabled: IN_PROCESS_CRON_DISABLED })
+  // Cadence itself (monthly vs yearly) comes from each tool's billingCycle.
+  @Cron('10 * * * *', { disabled: IN_PROCESS_CRON_DISABLED })
   async rollForwardRenewalDates() {
     await this.runWithDbRetry('rollForwardRenewalDates', () => this.rollForwardRenewalDatesImpl());
   }
